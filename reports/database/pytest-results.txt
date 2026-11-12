@@ -1,0 +1,32 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.3.5, pluggy-1.7.0 -- /home/amanda/projects/nexo/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/amanda/projects/nexo
+plugins: anyio-4.16.0
+collecting ... collected 17 items
+
+tests/test_health.py::test_health_check PASSED                           [  5%]
+tests/test_health.py::test_root PASSED                                   [ 11%]
+tests/test_orders.py::test_create_order PASSED                           [ 17%]
+tests/test_orders.py::test_order_reduces_stock PASSED                    [ 23%]
+tests/test_orders.py::test_insufficient_stock PASSED                     [ 29%]
+tests/test_orders.py::test_duplicate_products_in_order PASSED            [ 35%]
+tests/test_orders.py::test_inactive_product_cannot_be_ordered PASSED     [ 41%]
+tests/test_orders.py::test_inventory_adjustment PASSED                   [ 47%]
+tests/test_orders.py::test_negative_inventory_rejected PASSED            [ 52%]
+tests/test_orders.py::test_zero_inventory_adjustment_rejected PASSED     [ 58%]
+tests/test_products.py::test_create_product PASSED                       [ 64%]
+tests/test_products.py::test_list_products PASSED                        [ 70%]
+tests/test_products.py::test_get_product PASSED                          [ 76%]
+tests/test_products.py::test_duplicate_sku PASSED                        [ 82%]
+tests/test_products.py::test_negative_price PASSED                       [ 88%]
+tests/test_products.py::test_update_product PASSED                       [ 94%]
+tests/test_products.py::test_delete_product PASSED                       [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/starlette/testclient.py:37
+  /home/amanda/projects/nexo/.venv/lib/python3.12/site-packages/starlette/testclient.py:37: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 17 passed, 1 warning in 0.33s =========================
