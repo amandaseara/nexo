@@ -102,7 +102,7 @@ def delete_product(product_id: int, db: DBSession):
             detail="Producto no encontrado",
         )
 
-    db.delete(product)
+    product.active = False
     db.commit()
 
     return Response(status_code=204)
