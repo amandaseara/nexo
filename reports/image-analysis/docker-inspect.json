@@ -1,0 +1,87 @@
+[
+    {
+        "Id": "sha256:404584b137bdf3083059dbea2b4ba990fdd5060a4b77384f6f04ceb9d78089ce",
+        "RepoTags": [
+            "nexo-api:0.1.0"
+        ],
+        "RepoDigests": [
+            "nexo-api@sha256:404584b137bdf3083059dbea2b4ba990fdd5060a4b77384f6f04ceb9d78089ce"
+        ],
+        "Parent": "",
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2026-11-12T03:20:33.568065172Z",
+        "DockerVersion": "",
+        "Author": "",
+        "Architecture": "amd64",
+        "Os": "linux",
+        "Size": 75099555,
+        "GraphDriver": {
+            "Data": null,
+            "Name": "overlayfs"
+        },
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:9eb9a78eeb101ab215acf43ffb2a709d5fca9ca2a22178564c7ee5cc30774c60",
+                "sha256:9a0912b10e7336b5032c96abfaaad92f0fba6c03cbb315ea5f9ff37442520911",
+                "sha256:78a4eeeff9630145665d0439c75b49eb0fb4ae92de07a5fa541365d8587ac5aa",
+                "sha256:1f6b48d1b8f31d448ca0c4f981b51eaec48e38809d015e7d941534aa12c452b6",
+                "sha256:8281f3eeeb71c76645cafe2b07fa9a30043db9ea0734949b985420111eb0c182",
+                "sha256:f3507a45d2730ba54706dd196da98d59f58f2b6f26d765e0d6f47ace133c8512",
+                "sha256:04d943f676502b1198a8131e8ab4e28ee47461910173e81161bb1cadd269d12f",
+                "sha256:cd3cfb3e4a763a1eb6e572f2081bfab2a3078f9f3a51535b88b1b6fb9f3c2a56"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2026-11-12T08:52:03.624779632Z"
+        },
+        "Descriptor": {
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "digest": "sha256:404584b137bdf3083059dbea2b4ba990fdd5060a4b77384f6f04ceb9d78089ce",
+            "size": 856
+        },
+        "Config": {
+            "ArgsEscaped": true,
+            "Cmd": [
+                "uvicorn",
+                "app.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000"
+            ],
+            "Entrypoint": null,
+            "Env": [
+                "PATH=/opt/venv/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "LANG=C.UTF-8",
+                "GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305",
+                "PYTHON_VERSION=3.12.12",
+                "PYTHON_SHA256=fb85a13414b028c49ba18bbd523c2d055a30b56b18b92ce454ea2c51edc656c4",
+                "PYTHONDONTWRITEBYTECODE=1",
+                "PYTHONUNBUFFERED=1"
+            ],
+            "ExposedPorts": {
+                "8000/tcp": {}
+            },
+            "Healthcheck": {
+                "Interval": 30000000000,
+                "Retries": 3,
+                "StartPeriod": 15000000000,
+                "Test": [
+                    "CMD-SHELL",
+                    "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\""
+                ],
+                "Timeout": 5000000000
+            },
+            "Labels": {
+                "com.docker.compose.project": "nexo",
+                "com.docker.compose.service": "api",
+                "com.docker.compose.version": "2.39.2"
+            },
+            "OnBuild": null,
+            "User": "nexo",
+            "Volumes": null,
+            "WorkingDir": "/app"
+        }
+    }
+]
