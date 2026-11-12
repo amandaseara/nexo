@@ -1,0 +1,8 @@
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nexo-api   1/1     1            1           46m
+
+NAME                             READY   AGE
+statefulset.apps/nexo-postgres   1/1     46m
+
+NAME                        STATUS     COMPLETIONS   DURATION   AGE
+job.batch/nexo-migrations   Complete   1/1           15s        8m12s

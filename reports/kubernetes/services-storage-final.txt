@@ -1,0 +1,6 @@
+NAME                    TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+service/nexo-api        ClusterIP   10.103.133.182   <none>        8000/TCP   46m
+service/nexo-postgres   ClusterIP   10.111.206.49    <none>        5432/TCP   46m
+
+NAME                                                     STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+persistentvolumeclaim/postgres-storage-nexo-postgres-0   Bound    pvc-52c68cd7-6e53-49b1-bcb1-5a836a1f04ac   1Gi        RWO            standard       <unset>                 46m

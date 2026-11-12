@@ -1,0 +1,75 @@
+{{- if .Values.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrations
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-migrations
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-migrations
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: alembic
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for PostgreSQL..."
+              for i in $(seq 1 60); do
+                if python -c "import os; from sqlalchemy import create_engine; e=create_engine(os.environ['DATABASE_URL'], connect_args={'connect_timeout': 5}); c=e.connect(); c.close(); e.dispose()" 2>/dev/null; then
+                  echo "PostgreSQL is ready."
+                  break
+                fi
+                if [ "$i" -eq 60 ]; then
+                  echo "PostgreSQL connection timeout."
+                  exit 1
+                fi
+                sleep 3
+              done
+
+              echo "Applying database migrations..."
+              alembic upgrade head
+
+              echo "Migration completed."
+
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secret
+                  key: DATABASE_URL
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

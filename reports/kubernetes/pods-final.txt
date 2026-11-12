@@ -1,0 +1,4 @@
+NAME                        READY   STATUS      RESTARTS   AGE     IP           NODE       NOMINATED NODE   READINESS GATES
+nexo-api-74889ccc55-rq8s4   1/1     Running     0          8m12s   10.244.0.8   minikube   <none>           <none>
+nexo-migrations-xmw26       0/1     Completed   0          8m12s   10.244.0.9   minikube   <none>           <none>
+nexo-postgres-0             1/1     Running     0          46m     10.244.0.5   minikube   <none>           <none>

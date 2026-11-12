@@ -1,0 +1,56 @@
+
+replicaCount: 2
+
+image:
+  repository: nexo-api
+  tag: "0.3.1"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+app:
+  name: NEXO
+  environment: development
+
+database:
+  name: nexo
+  user: nexo
+  password: nexo_password
+  image: postgres:16.10
+  storage: 1Gi
+  port: 5432
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+postgresResources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  readiness:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  liveness:
+    initialDelaySeconds: 20
+    periodSeconds: 10
+
+ingress:
+  enabled: false
+  className: nginx
+  host: nexo.local
+
+migration:
+  enabled: true
+  revision: "e6a64989b8f6"
