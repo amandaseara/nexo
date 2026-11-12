@@ -1,4 +1,5 @@
-FROM python:3.12-slim-bookworm AS builder
+# Builder
+FROM python:3.12.16-slim-trixie AS builder
 
 WORKDIR /build
 
@@ -9,8 +10,8 @@ RUN python -m venv /opt/venv \
        -r requirements.txt
 
 
-# Imagen base
-FROM python:3.12-slim-bookworm AS runtime
+# Runtime
+FROM python:3.12.16-slim-trixie AS runtime
 
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -18,21 +19,21 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 WORKDIR /app
 
-# Usuario
 RUN groupadd --system nexo \
     && useradd --system --gid nexo \
        --home-dir /app nexo
 
 COPY --from=builder /opt/venv /opt/venv
-
 COPY --chown=nexo:nexo app/ ./app/
 
 USER nexo
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s \
-    --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s \
+    --timeout=5s \
+    --start-period=15s \
+    --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
 
 CMD ["uvicorn", "app.main:app", \
