@@ -102,4 +102,10 @@ def test_delete_product(client, sample_product):
     response = client.delete(f"/products/{created['id']}")
 
     assert response.status_code == 204
-    assert client.get(f"/products/{created['id']}").status_code == 404
+
+    product_response = client.get(
+        f"/products/{created['id']}"
+    )
+
+    assert product_response.status_code == 200
+    assert product_response.json()["active"] is False
