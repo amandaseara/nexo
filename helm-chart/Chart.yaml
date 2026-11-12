@@ -1,0 +1,7 @@
+
+apiVersion: v2
+name: nexo
+description: Helm Chart for NEXO business management platform
+type: application
+version: 0.1.0
+appVersion: "0.3.1"
