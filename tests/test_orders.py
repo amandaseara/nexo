@@ -134,3 +134,13 @@ def test_negative_inventory_rejected(client):
     ).json()
 
     assert inventory["quantity"] == 5
+
+def test_zero_inventory_adjustment_rejected(client):
+    product = create_product(client)
+
+    response = client.post(
+        f"/inventory/{product['id']}/adjust",
+        json={"adjustment": 0},
+    )
+
+    assert response.status_code == 422

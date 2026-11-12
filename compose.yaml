@@ -22,5 +22,27 @@ services:
 
     restart: unless-stopped
 
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+
+    image: nexo-api:0.1.0
+    container_name: nexo-api
+
+    environment:
+      APP_NAME: NEXO
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://nexo:nexo_password@postgres:5432/nexo
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
 volumes:
   postgres_data:
