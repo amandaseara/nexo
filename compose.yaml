@@ -27,7 +27,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile
 
-    image: nexo-api:0.1.0
+    image: nexo-api:0.2.0
     container_name: nexo-api
 
     environment:

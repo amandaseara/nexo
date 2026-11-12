@@ -1,4 +1,4 @@
-FROM python:3.12.12-slim-bookworm AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /build
 
@@ -9,8 +9,8 @@ RUN python -m venv /opt/venv \
        -r requirements.txt
 
 
-# Imagen
-FROM python:3.12.12-slim-bookworm AS runtime
+# Imagen base
+FROM python:3.12-slim-bookworm AS runtime
 
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \

@@ -7,8 +7,7 @@ from app.routers.inventory import router as inventory_router
 app = FastAPI(
     title="NEXO",
     description=(
-        "Sistema de gestión de pedidos e inventario "
-        "con monitoreo en tiempo real."
+        "Sistema de gestión de pedidos e inventariocon monitoreo en tiempo real."
     ),
     version="0.2.0",
 )
