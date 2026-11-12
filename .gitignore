@@ -25,3 +25,5 @@ Thumbs.db
 # Terraform / Kubernetes local files
 .terraform/
 *.tfstate
+
+backups/

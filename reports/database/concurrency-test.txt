@@ -1,0 +1,3 @@
+Respuestas HTTP: [201, 409]
+Stock restante: 1
+PASS: control de concurrencia correcto
