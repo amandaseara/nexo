@@ -4,7 +4,7 @@ app:
   environment: development
 
 image:
-  tag: "0.3.1"
+  tag: "0.3.2"
 
 ingress:
   enabled: false

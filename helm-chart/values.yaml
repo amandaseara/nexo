@@ -50,3 +50,7 @@ ingress:
   enabled: false
   className: nginx
   host: nexo.local
+
+migration:
+  enabled: true
+  revision: "e6a64989b8f6"

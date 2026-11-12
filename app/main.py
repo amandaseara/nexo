@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 
@@ -31,7 +30,6 @@ def health_check():
 
 @app.get("/health/ready", tags=["Health"])
 def readiness_check():
-    """Comprueba que la API puede conectarse a PostgreSQL."""
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
@@ -42,7 +40,7 @@ def readiness_check():
             "database": "connected",
         }
 
-    except Exception:
+    except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail={
@@ -50,7 +48,7 @@ def readiness_check():
                 "application": "NEXO",
                 "database": "disconnected",
             },
-        )
+        ) from exc
 
 @app.get("/", tags=["General"])
 def root():

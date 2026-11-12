@@ -1,0 +1,39 @@
+NAME: nexo
+LAST DEPLOYED: Thu Nov 12 20:34:32 2026
+NAMESPACE: nexo
+STATUS: deployed
+REVISION: 4
+DESCRIPTION: Upgrade complete
+RESOURCES:
+==> v1/Job
+NAME              STATUS     COMPLETIONS   DURATION   AGE
+nexo-migrations   Complete   1/1           15s        8m13s
+
+==> v1/Secret
+NAME          TYPE     DATA   AGE
+nexo-secret   Opaque   2      46m
+
+==> v1/ConfigMap
+NAME          DATA   AGE
+nexo-config   6      46m
+
+==> v1/Service
+NAME       TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+nexo-api   ClusterIP   10.103.133.182   <none>        8000/TCP   46m
+nexo-postgres   ClusterIP   10.111.206.49   <none>   5432/TCP   46m
+
+==> v1/Deployment
+NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+nexo-api   1/1     1            1           46m
+
+==> v1/Pod(related)
+NAME                        READY   STATUS    RESTARTS   AGE
+nexo-api-74889ccc55-rq8s4   1/1     Running   0          8m13s
+nexo-postgres-0   1/1   Running   0     46m
+
+==> v1/StatefulSet
+NAME            READY   AGE
+nexo-postgres   1/1     46m
+
+
+TEST SUITE: None
