@@ -1,3 +1,4 @@
+
 # Builder
 FROM python:3.12.16-slim-trixie AS builder
 
@@ -24,7 +25,10 @@ RUN groupadd --system nexo \
        --home-dir /app nexo
 
 COPY --from=builder /opt/venv /opt/venv
+
 COPY --chown=nexo:nexo app/ ./app/
+COPY --chown=nexo:nexo migrations/ ./migrations/
+COPY --chown=nexo:nexo alembic.ini ./alembic.ini
 
 USER nexo
 
