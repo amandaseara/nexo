@@ -18,6 +18,9 @@ spec:
     spec:
       automountServiceAccountToken: false
 
+      imagePullSecrets:
+        - name: ghcr-secret
+
       securityContext:
         runAsNonRoot: true
         runAsUser: 999

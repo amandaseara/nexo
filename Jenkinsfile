@@ -155,13 +155,12 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                echo 'Building NEXO Docker image...'
+                echo "Building NEXO image: ${IMAGE_NAME}:build-${BUILD_NUMBER}"
 
                 sh '''
                     docker build \
                         -f docker/Dockerfile \
                         -t ${IMAGE_NAME}:build-${BUILD_NUMBER} \
-                        -t ${IMAGE_NAME}:latest \
                         .
                 '''
 
@@ -204,7 +203,7 @@ pipeline {
 
         stage('Publish to GHCR') {
             steps {
-                echo 'Publishing NEXO image to GitHub Container Registry...'
+                echo "Publishing ${IMAGE_NAME}:build-${BUILD_NUMBER}"
 
                 withCredentials([
                     usernamePassword(
@@ -214,18 +213,74 @@ pipeline {
                     )
                 ]) {
                     sh '''
+                        set -e
+
                         echo "$GHCR_TOKEN" | docker login ghcr.io \
                             -u "$GHCR_USER" \
                             --password-stdin
 
                         docker push ${IMAGE_NAME}:build-${BUILD_NUMBER}
-                        docker push ${IMAGE_NAME}:latest
 
                         docker logout ghcr.io
                     '''
                 }
 
                 echo 'NEXO image published successfully.'
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo "Deploying NEXO build-${BUILD_NUMBER} to Minikube..."
+
+                sh '''
+                    set -e
+
+                    mkdir -p reports/jenkins
+
+                    echo "Deploying image: ${IMAGE_NAME}:build-${BUILD_NUMBER}"
+
+                    helm upgrade --install nexo ./helm-chart \
+                        --namespace nexo \
+                        --create-namespace \
+                        -f helm-chart/values.yaml \
+                        -f helm-chart/values-dev.yaml \
+                        --set-string image.tag=build-${BUILD_NUMBER} \
+                        --server-side=false \
+                        --wait \
+                        --timeout 5m \
+                        > reports/jenkins/helm-deploy.txt 2>&1
+
+                    cat reports/jenkins/helm-deploy.txt
+
+                    echo "Checking Kubernetes rollout..."
+
+                    kubectl rollout status deployment/nexo-api \
+                        --namespace nexo \
+                        --timeout=180s \
+                        > reports/jenkins/rollout.txt 2>&1
+
+                    cat reports/jenkins/rollout.txt
+
+                    echo "Checking deployed image..."
+
+                    kubectl get deployment nexo-api \
+                        --namespace nexo \
+                        -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].image}' \
+                        > reports/jenkins/deployed-image.txt
+
+                    cat reports/jenkins/deployed-image.txt
+
+                    EXPECTED_IMAGE="${IMAGE_NAME}:build-${BUILD_NUMBER}"
+                    ACTUAL_IMAGE=$(cat reports/jenkins/deployed-image.txt)
+
+                    if [ "$ACTUAL_IMAGE" != "$EXPECTED_IMAGE" ]; then
+                        echo "ERROR: Deployed image does not match expected image."
+                        exit 1
+                    fi
+
+                    echo "Deployment image validated successfully."
+                '''
             }
         }
     }
