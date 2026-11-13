@@ -63,7 +63,12 @@ pipeline {
 
     post {
         always {
-            echo 'Archiving test results...'
+            echo 'Publishing test results...'
+
+            junit(
+                testResults: 'reports/jenkins/junit.xml',
+                allowEmptyResults: true
+            )
 
             archiveArtifacts(
                 artifacts: 'reports/jenkins/*',
