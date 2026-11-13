@@ -59,6 +59,45 @@ pipeline {
                 '''
             }
         }
+
+
+        stage('Semgrep Security Scan') {
+            steps {
+                echo 'Running Semgrep security analysis...'
+
+                sh '''
+                    mkdir -p reports
+
+                    set +e
+
+                    /var/lib/jenkins/.local/bin/semgrep scan \
+                        --config security/semgrep/rules.yml \
+                        --text \
+                        --error \
+                        > reports/semgrep-report.txt 2>&1
+
+                    SCAN_STATUS=$?
+
+                    /var/lib/jenkins/.local/bin/semgrep scan \
+                        --config security/semgrep/rules.yml \
+                        --json \
+                        --output reports/semgrep-report.json
+
+                    JSON_STATUS=$?
+
+                    echo "Semgrep exit code: $SCAN_STATUS"
+                    echo "JSON report exit code: $JSON_STATUS"
+
+                    cat reports/semgrep-report.txt
+
+                    if [ "$JSON_STATUS" -ne 0 ]; then
+                        exit "$JSON_STATUS"
+                    fi
+
+                    exit "$SCAN_STATUS"
+                '''
+            }
+        }
     }
 
     post {
