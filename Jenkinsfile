@@ -116,6 +116,7 @@ pipeline {
 
                         snyk test \
                             --file=requirements.txt \
+                            --command=./.venv/bin/python \
                             --json-file-output=reports/snyk-production.json \
                             > reports/snyk-production.txt 2>&1
 
@@ -124,6 +125,7 @@ pipeline {
                         snyk test \
                             --file=requirements-dev.txt \
                             --package-manager=pip \
+                            --command=./.venv/bin/python \
                             --json-file-output=reports/snyk-development.json \
                             > reports/snyk-development.txt 2>&1
 
@@ -135,49 +137,16 @@ pipeline {
                         cat reports/snyk-production.txt
                         cat reports/snyk-development.txt
 
+                        cat reports/snyk-production.txt \
+                            reports/snyk-development.txt \
+                            > reports/snyk-report.txt
+
                         if [ "$PROD_STATUS" -gt 1 ] || [ "$DEV_STATUS" -gt 1 ]; then
                             echo "SNYK ERROR: Dependency scanning failed."
                             exit 2
                         fi
 
-                        python3 - <<'PY'
-        import json
-        import sys
-
-        files = [
-            "reports/snyk-production.json",
-            "reports/snyk-development.json"
-        ]
-
-        critical = []
-
-        for filename in files:
-            try:
-                with open(filename, encoding="utf-8") as report:
-                    data = json.load(report)
-            except (OSError, json.JSONDecodeError) as error:
-                print(f"Could not read {filename}: {error}")
-                sys.exit(2)
-
-            for vulnerability in data.get("vulnerabilities", []):
-                if vulnerability.get("severity", "").lower() == "critical":
-                    critical.append((filename, vulnerability))
-
-        print(f"Critical vulnerabilities found: {len(critical)}")
-
-        for filename, vulnerability in critical:
-            print(
-                f"{filename}: "
-                f"{vulnerability.get('id')} - "
-                f"{vulnerability.get('title')}"
-            )
-
-        if critical:
-            print("SNYK SECURITY GATE: FAILED")
-            sys.exit(1)
-
-        print("SNYK SECURITY GATE: PASSED")
-        PY
+                        python3 scripts/check_snyk.py
                     '''
                 }
             }
