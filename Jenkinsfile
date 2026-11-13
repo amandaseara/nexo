@@ -14,6 +14,7 @@ pipeline {
         DATABASE_URL = 'sqlite+pysqlite:///:memory:'
         PYTHONDONTWRITEBYTECODE = '1'
         PIP_DISABLE_PIP_VERSION_CHECK = '1'
+        IMAGE_NAME = 'ghcr.io/amandaseara/nexo-api'
     }
 
     stages {
@@ -151,6 +152,82 @@ pipeline {
                 }
             }
         }
+
+        stage('Docker Build') {
+            steps {
+                echo 'Building NEXO Docker image...'
+
+                sh '''
+                    docker build \
+                        -f docker/Dockerfile \
+                        -t ${IMAGE_NAME}:build-${BUILD_NUMBER} \
+                        -t ${IMAGE_NAME}:latest \
+                        .
+                '''
+
+                echo 'Docker image built successfully.'
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                echo 'Scanning NEXO Docker image with Trivy...'
+
+                sh '''
+                    mkdir -p reports
+
+                    trivy image \
+                        --scanners vuln \
+                        --severity HIGH,CRITICAL \
+                        --format table \
+                        --output reports/trivy-image.txt \
+                        ${IMAGE_NAME}:build-${BUILD_NUMBER}
+
+                    trivy image \
+                        --scanners vuln \
+                        --format json \
+                        --output reports/trivy-image.json \
+                        ${IMAGE_NAME}:build-${BUILD_NUMBER}
+
+                    cat reports/trivy-image.txt
+
+                    echo "Checking critical vulnerabilities..."
+
+                    trivy image \
+                        --scanners vuln \
+                        --severity CRITICAL \
+                        --exit-code 1 \
+                        ${IMAGE_NAME}:build-${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Publish to GHCR') {
+            steps {
+                echo 'Publishing NEXO image to GitHub Container Registry...'
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'GHCR_CREDENTIALS',
+                        usernameVariable: 'GHCR_USER',
+                        passwordVariable: 'GHCR_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        echo "$GHCR_TOKEN" | docker login ghcr.io \
+                            -u "$GHCR_USER" \
+                            --password-stdin
+
+                        docker push ${IMAGE_NAME}:build-${BUILD_NUMBER}
+                        docker push ${IMAGE_NAME}:latest
+
+                        docker logout ghcr.io
+                    '''
+                }
+
+                echo 'NEXO image published successfully.'
+            }
+        }
     }
 
     post {
@@ -163,7 +240,7 @@ pipeline {
             )
 
             archiveArtifacts(
-                artifacts: 'reports/jenkins/*,reports/semgrep-report.*,reports/snyk-*',
+                artifacts: 'reports/jenkins/*,reports/semgrep-report.*,reports/snyk-*,reports/trivy-image.*',
                 allowEmptyArchive: true
             )
         }
