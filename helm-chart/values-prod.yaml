@@ -4,7 +4,7 @@ app:
   environment: production
 
 image:
-  repository: your-registry/nexo-api
+  repository: ghcr.io/amandaseara/nexo-api
   tag: "0.3.1"
   pullPolicy: IfNotPresent
 
