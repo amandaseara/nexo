@@ -98,6 +98,90 @@ pipeline {
                 '''
             }
         }
+
+        stage('Snyk Dependency Scan') {
+            steps {
+                echo 'Scanning Python dependencies with Snyk...'
+
+                withCredentials([
+                    string(
+                        credentialsId: 'SNYK_TOKEN',
+                        variable: 'SNYK_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        mkdir -p reports
+
+                        set +e
+
+                        snyk test \
+                            --file=requirements.txt \
+                            --json-file-output=reports/snyk-production.json \
+                            > reports/snyk-production.txt 2>&1
+
+                        PROD_STATUS=$?
+
+                        snyk test \
+                            --file=requirements-dev.txt \
+                            --package-manager=pip \
+                            --json-file-output=reports/snyk-development.json \
+                            > reports/snyk-development.txt 2>&1
+
+                        DEV_STATUS=$?
+
+                        echo "Production scan exit code: $PROD_STATUS"
+                        echo "Development scan exit code: $DEV_STATUS"
+
+                        cat reports/snyk-production.txt
+                        cat reports/snyk-development.txt
+
+                        if [ "$PROD_STATUS" -gt 1 ] || [ "$DEV_STATUS" -gt 1 ]; then
+                            echo "SNYK ERROR: Dependency scanning failed."
+                            exit 2
+                        fi
+
+                        python3 - <<'PY'
+        import json
+        import sys
+
+        files = [
+            "reports/snyk-production.json",
+            "reports/snyk-development.json"
+        ]
+
+        critical = []
+
+        for filename in files:
+            try:
+                with open(filename, encoding="utf-8") as report:
+                    data = json.load(report)
+            except (OSError, json.JSONDecodeError) as error:
+                print(f"Could not read {filename}: {error}")
+                sys.exit(2)
+
+            for vulnerability in data.get("vulnerabilities", []):
+                if vulnerability.get("severity", "").lower() == "critical":
+                    critical.append((filename, vulnerability))
+
+        print(f"Critical vulnerabilities found: {len(critical)}")
+
+        for filename, vulnerability in critical:
+            print(
+                f"{filename}: "
+                f"{vulnerability.get('id')} - "
+                f"{vulnerability.get('title')}"
+            )
+
+        if critical:
+            print("SNYK SECURITY GATE: FAILED")
+            sys.exit(1)
+
+        print("SNYK SECURITY GATE: PASSED")
+        PY
+                    '''
+                }
+            }
+        }
     }
 
     post {
@@ -110,7 +194,7 @@ pipeline {
             )
 
             archiveArtifacts(
-                artifacts: 'reports/jenkins/*',
+                artifacts: 'reports/jenkins/*,reports/semgrep-report.*,reports/snyk-*',
                 allowEmptyArchive: true
             )
         }
