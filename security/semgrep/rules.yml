@@ -1,0 +1,29 @@
+rules:
+  - id: python-subprocess-shell-true
+    languages:
+      - python
+    severity: ERROR
+    message: >
+      Avoid subprocess calls with shell=True.
+      Use argument lists and shell=False to prevent command injection.
+    metadata:
+      category: security
+      cwe: "CWE-78"
+      technology:
+        - python
+    patterns:
+      - pattern: subprocess.$FUNC(..., shell=True, ...)
+
+  - id: python-dangerous-eval
+    languages:
+      - python
+    severity: ERROR
+    message: >
+      Avoid eval() with potentially untrusted input.
+      Use safer alternatives such as explicit parsing.
+    metadata:
+      category: security
+      cwe: "CWE-95"
+      technology:
+        - python
+    pattern: eval(...)

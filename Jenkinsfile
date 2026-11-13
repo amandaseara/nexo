@@ -1,0 +1,311 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(
+            numToKeepStr: '10'
+        ))
+        skipDefaultCheckout(true)
+    }
+
+    environment {
+        DATABASE_URL = 'sqlite+pysqlite:///:memory:'
+        PYTHONDONTWRITEBYTECODE = '1'
+        PIP_DISABLE_PIP_VERSION_CHECK = '1'
+        IMAGE_NAME = 'ghcr.io/amandaseara/nexo-api'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo 'Cloning Nexo repository...'
+                checkout scm
+            }
+        }
+
+        stage('Environment Setup') {
+            steps {
+                echo 'Checking Python environment...'
+
+                sh '''
+                    python3 --version
+                    python3 -m venv .venv
+
+                    ./.venv/bin/python -m pip install --upgrade pip
+                    ./.venv/bin/pip install -r requirements-dev.txt
+                '''
+            }
+        }
+
+        stage('Tests') {
+            steps {
+                echo 'Running Nexo automated tests...'
+
+                sh '''
+                    mkdir -p reports/jenkins
+
+                    set +e
+                    ./.venv/bin/python -m pytest -v \
+                        --junitxml=reports/jenkins/junit.xml \
+                        > reports/jenkins/pytest.txt 2>&1
+
+                    TEST_STATUS=$?
+
+                    cat reports/jenkins/pytest.txt
+
+                    exit $TEST_STATUS
+                '''
+            }
+        }
+
+
+        stage('Semgrep Security Scan') {
+            steps {
+                echo 'Running Semgrep security analysis...'
+
+                sh '''
+                    mkdir -p reports
+
+                    set +e
+
+                    /var/lib/jenkins/.local/bin/semgrep scan \
+                        --config security/semgrep/rules.yml \
+                        --text \
+                        --error \
+                        > reports/semgrep-report.txt 2>&1
+
+                    SCAN_STATUS=$?
+
+                    /var/lib/jenkins/.local/bin/semgrep scan \
+                        --config security/semgrep/rules.yml \
+                        --json \
+                        --output reports/semgrep-report.json
+
+                    JSON_STATUS=$?
+
+                    echo "Semgrep exit code: $SCAN_STATUS"
+                    echo "JSON report exit code: $JSON_STATUS"
+
+                    cat reports/semgrep-report.txt
+
+                    if [ "$JSON_STATUS" -ne 0 ]; then
+                        exit "$JSON_STATUS"
+                    fi
+
+                    exit "$SCAN_STATUS"
+                '''
+            }
+        }
+
+        stage('Snyk Dependency Scan') {
+            steps {
+                echo 'Scanning Python dependencies with Snyk...'
+
+                withCredentials([
+                    string(
+                        credentialsId: 'SNYK_TOKEN',
+                        variable: 'SNYK_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        mkdir -p reports
+
+                        set +e
+
+                        snyk test \
+                            --file=requirements.txt \
+                            --command=./.venv/bin/python \
+                            --json-file-output=reports/snyk-production.json \
+                            > reports/snyk-production.txt 2>&1
+
+                        PROD_STATUS=$?
+
+                        snyk test \
+                            --file=requirements-dev.txt \
+                            --package-manager=pip \
+                            --command=./.venv/bin/python \
+                            --json-file-output=reports/snyk-development.json \
+                            > reports/snyk-development.txt 2>&1
+
+                        DEV_STATUS=$?
+
+                        echo "Production scan exit code: $PROD_STATUS"
+                        echo "Development scan exit code: $DEV_STATUS"
+
+                        cat reports/snyk-production.txt
+                        cat reports/snyk-development.txt
+
+                        cat reports/snyk-production.txt \
+                            reports/snyk-development.txt \
+                            > reports/snyk-report.txt
+
+                        if [ "$PROD_STATUS" -gt 1 ] || [ "$DEV_STATUS" -gt 1 ]; then
+                            echo "SNYK ERROR: Dependency scanning failed."
+                            exit 2
+                        fi
+
+                        python3 scripts/check_snyk.py
+                    '''
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                echo "Building NEXO image: ${IMAGE_NAME}:build-${BUILD_NUMBER}"
+
+                sh '''
+                    docker build \
+                        -f docker/Dockerfile \
+                        -t ${IMAGE_NAME}:build-${BUILD_NUMBER} \
+                        .
+                '''
+
+                echo 'Docker image built successfully.'
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                echo 'Scanning NEXO Docker image with Trivy...'
+
+                sh '''
+                    mkdir -p reports
+
+                    trivy image \
+                        --scanners vuln \
+                        --severity HIGH,CRITICAL \
+                        --format table \
+                        --output reports/trivy-image.txt \
+                        ${IMAGE_NAME}:build-${BUILD_NUMBER}
+
+                    trivy image \
+                        --scanners vuln \
+                        --format json \
+                        --output reports/trivy-image.json \
+                        ${IMAGE_NAME}:build-${BUILD_NUMBER}
+
+                    cat reports/trivy-image.txt
+
+                    echo "Checking critical vulnerabilities..."
+
+                    trivy image \
+                        --scanners vuln \
+                        --severity CRITICAL \
+                        --exit-code 1 \
+                        ${IMAGE_NAME}:build-${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Publish to GHCR') {
+            steps {
+                echo "Publishing ${IMAGE_NAME}:build-${BUILD_NUMBER}"
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'GHCR_CREDENTIALS',
+                        usernameVariable: 'GHCR_USER',
+                        passwordVariable: 'GHCR_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set -e
+
+                        echo "$GHCR_TOKEN" | docker login ghcr.io \
+                            -u "$GHCR_USER" \
+                            --password-stdin
+
+                        docker push ${IMAGE_NAME}:build-${BUILD_NUMBER}
+
+                        docker logout ghcr.io
+                    '''
+                }
+
+                echo 'NEXO image published successfully.'
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo "Deploying NEXO build-${BUILD_NUMBER} to Minikube..."
+
+                sh '''
+                    set -e
+
+                    mkdir -p reports/jenkins
+
+                    echo "Deploying image: ${IMAGE_NAME}:build-${BUILD_NUMBER}"
+
+                    helm upgrade --install nexo ./helm-chart \
+                        --namespace nexo \
+                        --create-namespace \
+                        -f helm-chart/values.yaml \
+                        -f helm-chart/values-dev.yaml \
+                        --set-string image.tag=build-${BUILD_NUMBER} \
+                        --server-side=false \
+                        --wait \
+                        --timeout 5m \
+                        > reports/jenkins/helm-deploy.txt 2>&1
+
+                    cat reports/jenkins/helm-deploy.txt
+
+                    echo "Checking Kubernetes rollout..."
+
+                    kubectl rollout status deployment/nexo-api \
+                        --namespace nexo \
+                        --timeout=180s \
+                        > reports/jenkins/rollout.txt 2>&1
+
+                    cat reports/jenkins/rollout.txt
+
+                    echo "Checking deployed image..."
+
+                    kubectl get deployment nexo-api \
+                        --namespace nexo \
+                        -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].image}' \
+                        > reports/jenkins/deployed-image.txt
+
+                    cat reports/jenkins/deployed-image.txt
+
+                    EXPECTED_IMAGE="${IMAGE_NAME}:build-${BUILD_NUMBER}"
+                    ACTUAL_IMAGE=$(cat reports/jenkins/deployed-image.txt)
+
+                    if [ "$ACTUAL_IMAGE" != "$EXPECTED_IMAGE" ]; then
+                        echo "ERROR: Deployed image does not match expected image."
+                        exit 1
+                    fi
+
+                    echo "Deployment image validated successfully."
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Publishing test results...'
+
+            junit(
+                testResults: 'reports/jenkins/junit.xml',
+                allowEmptyResults: true
+            )
+
+            archiveArtifacts(
+                artifacts: 'reports/jenkins/*,reports/semgrep-report.*,reports/snyk-*,reports/trivy-image.*',
+                allowEmptyArchive: true
+            )
+        }
+
+        success {
+            echo 'NEXO CI PIPELINE: SUCCESS'
+        }
+
+        failure {
+            echo 'NEXO CI PIPELINE: FAILURE'
+        }
+    }
+}
