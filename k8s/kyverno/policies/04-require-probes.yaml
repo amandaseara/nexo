@@ -1,0 +1,24 @@
+# Política 4 (buena práctica elegida): exige readinessProbe y livenessProbe.
+# Sin readiness, Kubernetes manda tráfico a pods que todavía no están listos
+# (por ejemplo durante un rolling update). Sin liveness, un proceso colgado nunca se reinicia.
+# Aplica solo a Deployment y StatefulSet: un Job corre y termina, no necesita probes.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-probes
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets]
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: nexo
+  validations:
+    - expression: >-
+        object.spec.template.spec.containers.all(c,
+          has(c.readinessProbe) && has(c.livenessProbe))
+      message: "Los contenedores deben definir readinessProbe y livenessProbe."

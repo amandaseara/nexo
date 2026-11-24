@@ -1,0 +1,33 @@
+# Política 1: prohíbe imágenes sin tag o con el tag "latest".
+# Sin tag, Docker asume "latest". "latest" cambia de contenido con el tiempo,
+# así que el mismo despliegue podría correr imágenes distintas.
+#
+# Formato: Kyverno 1.20 usa ValidatingPolicy. Cada "validation" es una expresión CEL
+# que tiene que dar true; si da false, el pedido se rechaza (validationActions: Deny).
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: nexo
+  # También valida Deployments, StatefulSets y Jobs (así el error aparece al hacer el apply)
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, jobs]
+  variables:
+    - name: images
+      expression: "object.spec.containers.map(c, c.image)"
+  validations:
+    - expression: "variables.images.all(img, img.contains(':'))"
+      message: "Toda imagen debe tener un tag explícito (ej. nexo-api:0.4.0)."
+    - expression: "variables.images.all(img, !img.endsWith(':latest'))"
+      message: "No se permite el tag 'latest'. Usá una versión fija."

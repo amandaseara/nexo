@@ -1,0 +1,27 @@
+# Pod que dispara una alerta de Falco: busca claves privadas SSH en todo el disco
+# (find /etc /home -name id_rsa). Es lo que hace un atacante después de entrar a un contenedor:
+# buscar credenciales para saltar a otros sistemas. Falco lo detecta con la regla
+# por defecto "Search Private Keys or Passwords".
+#
+# A propósito, el pod CUMPLE las 4 políticas de Kyverno (tag fijo, no root, límites):
+# Kyverno lo deja entrar porque está bien configurado, pero Falco igual detecta
+# lo que hace una vez que corre. Preventivo (Kyverno) vs detectivo (Falco).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: falco-test
+  namespace: nexo
+  labels:
+    purpose: falco-test
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  containers:
+    - name: key-search
+      image: busybox:1.36
+      command: ["find", "/etc", "/home", "-name", "id_rsa"]
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 100m, memory: 32Mi}
