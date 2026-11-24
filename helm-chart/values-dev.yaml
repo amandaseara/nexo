@@ -3,9 +3,6 @@ replicaCount: 1
 app:
   environment: development
 
-image:
-  tag: "0.3.2"
-
 ingress:
   enabled: false
 
