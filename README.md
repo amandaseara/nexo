@@ -587,6 +587,7 @@ container_image_tag=1.36 k8s_pod_name=falco-test k8s_ns_name=nexo
 | El `ServiceMonitor` rompía `helm template` en Jenkins | La CRD de Prometheus Operator no existe fuera del clúster | Se crea solo si `.Capabilities` tiene `monitoring.coreos.com/v1/ServiceMonitor` |
 | `validate-kyverno.sh` daba error con NEXO ya desplegado | El *dry-run* intentaba modificar el Job de migraciones, que es inmutable | El *dry-run* usa otro nombre de *release* (`nexo-policy-check`) |
 | Jenkins no encontraba `docker`, `helm`, `semgrep`, etc. | Jenkins (launchd) arranca con un `PATH` mínimo | Variable global `PATH+EXTRA` con `/opt/homebrew/bin` y Python 3.12 |
+| Jenkins no podía publicar en GHCR (`permission_denied: write_package`) | La cuenta que ejecuta el pipeline no tenía permiso de escritura en el paquete de otra cuenta | El nombre de la imagen se configura con la variable global `GHCR_IMAGE` de Jenkins (por defecto `ghcr.io/amandaseara/nexo-api`) |
 | `helm upgrade --atomic` falla en Helm 4 | La opción se renombró en Helm 4 | Se usa `--rollback-on-failure` |
 | `minikube start` fallaba en el portátil de la demo (Apple M6, macOS 27) | Fallo de minikube al leer la información de CPU del host | `scripts/start-tools.sh` usa una librería de compatibilidad local solo para `minikube start` |
 
