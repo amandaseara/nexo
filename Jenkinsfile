@@ -15,7 +15,9 @@ pipeline {
         PYTHONDONTWRITEBYTECODE = '1'
         PIP_DISABLE_PIP_VERSION_CHECK = '1'
 
-        IMAGE_NAME = 'ghcr.io/amandaseara/nexo-api'
+        // Registro de la imagen. Se puede cambiar con la variable global
+        // GHCR_IMAGE de Jenkins (por ejemplo, para publicar en otra cuenta).
+        IMAGE_NAME = "${env.GHCR_IMAGE ?: 'ghcr.io/amandaseara/nexo-api'}"
 
         K8S_NAMESPACE = 'nexo'
         HELM_RELEASE = 'nexo'
