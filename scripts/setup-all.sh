@@ -2,7 +2,7 @@
 # Levanta TODO el entorno de NEXO desde cero:
 #   1. Docker, Minikube y Jenkins            (start-tools.sh)
 #   2. Operadores: Prometheus Operator + Grafana (monitoring-up.sh),
-#      Kyverno y Falco (si están sus scripts)
+#      Kyverno + políticas y Falco (install-security.sh)
 #   3. NEXO con Helm                          (deploy-local.sh)
 #   4. Port-forwards y tráfico de ejemplo
 #
@@ -25,16 +25,9 @@ step "1. Herramientas base"
 step "2. Monitorización (Prometheus + Grafana)"
 "$DIR/monitoring-up.sh"
 
-# Kyverno y Falco: scripts propios del equipo, si existen.
-for comp in kyverno falco; do
-    for s in "$DIR/$comp-up.sh" "$DIR/install-$comp.sh" "$DIR/$comp/install.sh"; do
-        if [[ -x $s ]]; then
-            step "2. $comp"
-            "$s"
-            break
-        fi
-    done
-done
+step "2. Kyverno (políticas) y Falco"
+# Instala ambos con sus charts oficiales y aplica las 4 políticas al namespace nexo.
+"$DIR/install-security.sh"
 
 step "3. Despliegue de NEXO"
 "$DIR/deploy-local.sh"

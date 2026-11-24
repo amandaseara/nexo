@@ -19,7 +19,8 @@ Sistema de gestión de pedidos e inventario. Es una API REST con **FastAPI** y *
 10. [Monitorización (Prometheus + Grafana)](#monitorización-prometheus--grafana)
 11. [Pipeline CI/CD (Jenkins)](#pipeline-cicd-jenkins)
 12. [Seguridad](#seguridad)
-13. [Informes](#informes)
+13. [Seguridad en el clúster: Kyverno y Falco](#seguridad-en-el-clúster-kyverno-y-falco)
+14. [Informes](#informes)
 
 ---
 
@@ -115,6 +116,8 @@ nexo/
 ├── grafana/dashboard.json # Dashboard de Grafana exportado
 ├── Jenkinsfile            # Pipeline CI/CD
 ├── security/semgrep/      # Reglas Semgrep personalizadas
+├── k8s/kyverno/           # Políticas de Kyverno (policies/) y manifiestos de prueba (tests/)
+├── k8s/falco/             # Pod que dispara la alerta de Falco
 ├── scripts/               # Utilidades (arranque local, test de concurrencia, análisis de informes)
 └── reports/               # Evidencias generadas (tests, escaneos, despliegue)
 ```
@@ -418,8 +421,122 @@ El agente necesita Python 3, Docker, Semgrep, Snyk CLI, Trivy, Helm y `kubectl` 
 | Snyk | SCA | Vulnerabilidades en dependencias Python |
 | Trivy | Escaneo de imagen | CVEs del sistema operativo y librerías de la imagen |
 | Dive | Análisis de capas | Eficiencia y tamaño de la imagen |
+| Kyverno | Políticas de admisión | Rechaza Pods inseguros antes de que se creen |
+| Falco | Seguridad en ejecución | Detecta comportamiento sospechoso en contenedores que ya están corriendo |
 
 Medidas en el despliegue: contenedores no root, `seccompProfile: RuntimeDefault`, sin token de *service account* montado en el Job de migraciones, límites de CPU/memoria, credenciales en `Secret` y PostgreSQL publicado solo en `127.0.0.1` en local.
+
+## Seguridad en el clúster: Kyverno y Falco
+
+Las dos herramientas cubren momentos distintos de la vida de un Pod:
+
+```
+kubectl apply / helm install
+        │
+        ▼
+  API server ──► Kyverno (admission webhook) ── no cumple ──► rechazado, el Pod nunca se crea
+        │ cumple
+        ▼
+  Pod corriendo ──► syscalls (open, execve...) ──► Falco (driver eBPF) ──► alerta en sus logs
+```
+
+- **Kyverno es preventivo:** revisa cómo está configurado un objeto *antes* de guardarlo en el clúster.
+- **Falco es detectivo:** mira qué hace el contenedor *mientras corre*. Avisa, no bloquea.
+
+### Instalación
+
+```bash
+./scripts/install-security.sh
+```
+
+Instala Kyverno (chart `kyverno/kyverno` 3.10.0, Kyverno v1.20) y Falco (chart `falcosecurity/falco` 9.2.2, Falco 0.45, driver `modern_ebpf`) con Helm, y aplica las políticas de `k8s/kyverno/policies/`. Es idempotente.
+
+### Políticas de Kyverno
+
+Kyverno v1.20 ya no acepta el formato `ClusterPolicy`. Las políticas usan el tipo nuevo, `ValidatingPolicy`: cada regla es una expresión CEL que tiene que dar `true`, y `validationActions: [Deny]` rechaza lo que no cumple. Aplican al namespace `nexo`.
+
+| Política | Qué exige | Por qué |
+|---|---|---|
+| `disallow-latest-tag` | Imagen con tag explícito y distinto de `latest` | `latest` cambia con el tiempo: el mismo despliegue podría correr imágenes distintas |
+| `require-requests-limits` | Requests y limits de CPU y memoria en todos los contenedores (también los initContainers) | Sin límites, un Pod puede consumir todo el nodo |
+| `require-run-as-non-root` | `securityContext.runAsNonRoot: true` en el Pod | Si explotan la app, root facilita escalar y escaparse al nodo |
+| `require-probes` (extra) | `readinessProbe` y `livenessProbe` en Deployments y StatefulSets | Sin readiness, el rolling update manda tráfico a Pods que no están listos; sin liveness, un proceso colgado nunca se reinicia. No aplica a Jobs: corren y terminan |
+
+Las tres primeras validan Pods y, con `autogen`, también Deployments, StatefulSets y Jobs, así el error aparece al hacer el `apply` y no después, cuando el ReplicaSet intenta crear los Pods.
+
+Ejemplo, la política de `latest`:
+
+```yaml
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: nexo
+  variables:
+    - name: images
+      expression: "object.spec.containers.map(c, c.image)"
+  validations:
+    - expression: "variables.images.all(img, !img.endsWith(':latest'))"
+      message: "No se permite el tag 'latest'. Usá una versión fija."
+```
+
+### Validación de las políticas
+
+```bash
+./scripts/validate-kyverno.sh
+```
+
+Aplica cada manifiesto de `k8s/kyverno/tests/`. Cada uno rompe una sola política, salvo `00-good-pod.yaml`, que cumple todas. Además renderiza el chart de NEXO y lo pasa por Kyverno con `kubectl apply --dry-run=server` para comprobar que la aplicación cumple las 4 políticas. La evidencia queda en `reports/kyverno-validation.log`.
+
+Resultado (fragmento):
+
+```
+--- 01-bad-latest-tag.yaml ---
+Error from server: ... admission webhook "vpol.validate.kyverno.svc-fail-..." denied the request:
+Policy disallow-latest-tag failed: No se permite el tag 'latest'. Usá una versión fija.
+Esperado: RECHAZADO | Resultado: RECHAZADO | OK
+
+--- 04-bad-no-probes.yaml ---
+Error from server: ... denied the request:
+Policy require-probes failed: Los contenedores deben definir readinessProbe y livenessProbe.
+Esperado: RECHAZADO | Resultado: RECHAZADO | OK
+
+--- Chart de NEXO (helm template + kubectl apply --dry-run=server) ---
+deployment.apps/nexo-api created (server dry run)
+statefulset.apps/nexo-postgres created (server dry run)
+job.batch/nexo-migrations-1 created (server dry run)
+Esperado: ADMITIDO | OK
+
+=== Resumen: 7 OK, 0 con error ===
+```
+
+### Evento de Falco
+
+```bash
+./scripts/trigger-falco.sh
+```
+
+Lanza `k8s/falco/falco-test-pod.yaml`: un Pod que ejecuta `find /etc /home -name id_rsa`, o sea que busca claves privadas SSH. Es lo que hace un atacante después de entrar a un contenedor: buscar credenciales para saltar a otros sistemas. Falco ve la syscall `execve` del proceso `find` y dispara la regla por defecto **Search Private Keys or Passwords** (prioridad Warning).
+
+El Pod cumple a propósito las 4 políticas de Kyverno (tag fijo, no root, límites): Kyverno lo deja entrar porque está bien configurado, y aun así Falco detecta lo que hace una vez que corre. Tampoco abre un shell, que la consigna no permite como evento.
+
+Alerta registrada (en `reports/falco-event.log`, recortada):
+
+```
+Warning Grep private keys or passwords activities found | evt_type=execve user_uid=1000
+process=find command=find /etc /home -name id_rsa container_image_repository=busybox
+container_image_tag=1.36 k8s_pod_name=falco-test k8s_ns_name=nexo
+```
 
 ## Informes
 
@@ -435,5 +552,7 @@ En `reports/` están las evidencias de cada fase:
 | `reports/semgrep-report.txt` | Semgrep: reglas aplicadas, 0 hallazgos en el proyecto y validación de las reglas con un ejemplo vulnerable |
 | `reports/monitoring/` | Pods, ServiceMonitor, targets de Prometheus y consultas de los paneles de Grafana |
 | `grafana/dashboard.json` | Dashboard de Grafana exportado |
+| `reports/kyverno-validation.log` | Pods rechazados y admitidos por cada política de Kyverno |
+| `reports/falco-event.log` | Alerta de Falco y descripción del evento |
 
 `scripts/compare_trivy.py` resume y compara los informes de Trivy de la imagen inicial y la final.

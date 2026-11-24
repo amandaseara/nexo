@@ -1,0 +1,56 @@
+=== Validación de políticas Kyverno: 2026-11-24 16:54:03 -0300 ===
+
+--- Políticas instaladas ---
+NAME                      AGE     READY
+disallow-latest-tag       4m59s   true
+require-requests-limits   4m59s   true
+require-run-as-non-root   4m59s   true
+require-probes            4m59s   true
+
+--- 00-good-pod.yaml ---
+# CUMPLE las 4 políticas: tiene que ser ADMITIDO.
+$ kubectl apply -f k8s/kyverno/tests/00-good-pod.yaml
+pod/good-pod created
+Esperado: ADMITIDO | Resultado: ADMITIDO | OK
+
+--- 01-bad-latest-tag.yaml ---
+# Rompe la política 1: usa el tag latest.
+$ kubectl apply -f k8s/kyverno/tests/01-bad-latest-tag.yaml
+Error from server: error when creating "k8s/kyverno/tests/01-bad-latest-tag.yaml": admission webhook "vpol.validate.kyverno.svc-fail" denied the request: Policy disallow-latest-tag failed: No se permite el tag 'latest'. Usá una versión fija.
+Esperado: RECHAZADO | Resultado: RECHAZADO | OK
+
+--- 01-bad-no-tag.yaml ---
+# Rompe la política 1: imagen sin tag (Docker asume latest).
+$ kubectl apply -f k8s/kyverno/tests/01-bad-no-tag.yaml
+Error from server: error when creating "k8s/kyverno/tests/01-bad-no-tag.yaml": admission webhook "vpol.validate.kyverno.svc-fail" denied the request: Policy disallow-latest-tag failed: Toda imagen debe tener un tag explícito (ej. nexo-api:0.4.0).
+Esperado: RECHAZADO | Resultado: RECHAZADO | OK
+
+--- 02-bad-no-limits.yaml ---
+# Rompe la política 2: no define requests ni limits.
+$ kubectl apply -f k8s/kyverno/tests/02-bad-no-limits.yaml
+Error from server: error when creating "k8s/kyverno/tests/02-bad-no-limits.yaml": admission webhook "vpol.validate.kyverno.svc-fail" denied the request: Policy require-requests-limits failed: Todos los contenedores deben definir requests y limits de CPU y memoria.
+Esperado: RECHAZADO | Resultado: RECHAZADO | OK
+
+--- 03-bad-root.yaml ---
+# Rompe la política 3: no pide runAsNonRoot (correría como root).
+$ kubectl apply -f k8s/kyverno/tests/03-bad-root.yaml
+Error from server: error when creating "k8s/kyverno/tests/03-bad-root.yaml": admission webhook "vpol.validate.kyverno.svc-fail" denied the request: Policy require-run-as-non-root failed: El Pod debe definir securityContext.runAsNonRoot: true.
+Esperado: RECHAZADO | Resultado: RECHAZADO | OK
+
+--- 04-bad-no-probes.yaml ---
+# Rompe la política 4: Deployment sin readinessProbe ni livenessProbe.
+$ kubectl apply -f k8s/kyverno/tests/04-bad-no-probes.yaml
+Error from server: error when creating "k8s/kyverno/tests/04-bad-no-probes.yaml": admission webhook "vpol.validate.kyverno.svc-fail" denied the request: Policy require-probes failed: Los contenedores deben definir readinessProbe y livenessProbe.
+Esperado: RECHAZADO | Resultado: RECHAZADO | OK
+
+--- Chart de NEXO (helm template + kubectl apply --dry-run=server) ---
+El dry-run en el servidor pasa por el webhook de Kyverno sin crear nada.
+configmap/nexo-config created (server dry run)
+service/nexo-api created (server dry run)
+service/nexo-postgres created (server dry run)
+deployment.apps/nexo-api created (server dry run)
+statefulset.apps/nexo-postgres created (server dry run)
+job.batch/nexo-migrations-1 created (server dry run)
+Esperado: ADMITIDO | OK
+
+=== Resumen: 7 OK, 0 con error ===

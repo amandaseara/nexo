@@ -1,0 +1,19 @@
+# Rompe la política 1: imagen sin tag (Docker asume latest).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-no-tag
+  namespace: nexo
+  labels:
+    purpose: kyverno-test
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  containers:
+    - name: app
+      image: busybox
+      command: ["sleep", "3600"]
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 50m, memory: 32Mi}

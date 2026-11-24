@@ -1,0 +1,33 @@
+# Política 2: exige requests y limits de CPU y memoria en todos los contenedores,
+# incluidos los initContainers.
+# Sin límites, un solo pod puede consumir todo el nodo y tirar a los demás.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-requests-limits
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: nexo
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, jobs]
+  variables:
+    - name: allContainers
+      expression: >-
+        object.spec.containers +
+        (has(object.spec.initContainers) ? object.spec.initContainers : [])
+  validations:
+    - expression: >-
+        variables.allContainers.all(c,
+          has(c.resources) &&
+          has(c.resources.requests) && 'cpu' in c.resources.requests && 'memory' in c.resources.requests &&
+          has(c.resources.limits) && 'cpu' in c.resources.limits && 'memory' in c.resources.limits)
+      message: "Todos los contenedores deben definir requests y limits de CPU y memoria."

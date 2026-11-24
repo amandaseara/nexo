@@ -1,0 +1,28 @@
+# Política 3: impide correr contenedores como root.
+# Si alguien explota la app, con root le es mucho más fácil escalar y escaparse al nodo.
+# Se exige runAsNonRoot: true a nivel Pod. Con eso Kubernetes además se niega a
+# arrancar el contenedor si la imagen intenta correr con UID 0.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-run-as-non-root
+spec:
+  validationActions: [Deny]
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: nexo
+  autogen:
+    podControllers:
+      controllers: [deployments, statefulsets, jobs]
+  validations:
+    - expression: >-
+        has(object.spec.securityContext) &&
+        has(object.spec.securityContext.runAsNonRoot) &&
+        object.spec.securityContext.runAsNonRoot == true
+      message: "El Pod debe definir securityContext.runAsNonRoot: true."

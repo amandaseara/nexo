@@ -16,20 +16,10 @@ helm uninstall nexo -n nexo --ignore-not-found --wait 2>/dev/null
 kubectl delete namespace nexo --ignore-not-found --wait=true
 
 echo "[3/5] Kyverno y Falco..."
-for comp in kyverno falco; do
-    done_custom=false
-    for s in "$DIR/$comp-down.sh" "$DIR/uninstall-$comp.sh" "$DIR/$comp/uninstall.sh"; do
-        [[ -x $s ]] && { "$s"; done_custom=true; break; }
-    done
-    if ! $done_custom; then
-        kubectl get clusterpolicy -o name 2>/dev/null | grep -q . && [[ $comp == kyverno ]] \
-            && kubectl delete clusterpolicy --all
-        for ns in "$comp" ; do
-            helm list -n "$ns" -q 2>/dev/null | xargs -I{} helm uninstall {} -n "$ns"
-            kubectl delete namespace "$ns" --ignore-not-found
-        done
-    fi
-done
+kubectl delete -f "$DIR/../k8s/kyverno/policies/" --ignore-not-found
+helm uninstall kyverno -n kyverno --ignore-not-found --wait 2>/dev/null
+helm uninstall falco -n falco --ignore-not-found --wait 2>/dev/null
+kubectl delete namespace kyverno falco --ignore-not-found
 
 echo "[4/5] Monitorización..."
 "$DIR/monitoring-down.sh" --purge-crds

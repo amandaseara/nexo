@@ -1,0 +1,19 @@
+# Rompe la política 1: usa el tag latest.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-latest-tag
+  namespace: nexo
+  labels:
+    purpose: kyverno-test
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  containers:
+    - name: app
+      image: busybox:latest
+      command: ["sleep", "3600"]
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 50m, memory: 32Mi}
