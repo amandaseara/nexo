@@ -4,9 +4,9 @@ services:
     container_name: nexo-postgres
 
     environment:
-      POSTGRES_USER: nexo
-      POSTGRES_PASSWORD: nexo_password
-      POSTGRES_DB: nexo
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
 
     ports:
       - "127.0.0.1:5435:5432"
@@ -15,7 +15,9 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexo -d nexo"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
       interval: 5s
       timeout: 3s
       retries: 10
@@ -26,14 +28,17 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-0.4.0}
 
-    image: nexo-api:0.3.0
+    image: nexo-api:${APP_VERSION:-0.4.0}
     container_name: nexo-api
 
     environment:
-      APP_NAME: NEXO
-      APP_ENV: development
-      DATABASE_URL: postgresql+psycopg://nexo:nexo_password@postgres:5432/nexo
+      APP_NAME: ${APP_NAME:-NEXO}
+      APP_ENV: ${APP_ENV:-development}
+      APP_VERSION: ${APP_VERSION:-0.4.0}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
 
     ports:
       - "127.0.0.1:8000:8000"

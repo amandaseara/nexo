@@ -1,4 +1,3 @@
-
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -15,6 +14,8 @@ spec:
       labels:
         app: {{ .Release.Name }}-postgres
     spec:
+      automountServiceAccountToken: false
+
       securityContext:
         runAsNonRoot: true
         runAsUser: 999
@@ -22,36 +23,51 @@ spec:
         fsGroup: 999
         seccompProfile:
           type: RuntimeDefault
+
       containers:
         - name: postgres
-          image: {{ .Values.database.image }}
+          image: {{ .Values.database.image | quote }}
           imagePullPolicy: IfNotPresent
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
           ports:
             - containerPort: 5432
               name: postgres
+
           env:
             - name: POSTGRES_DB
               valueFrom:
                 configMapKeyRef:
                   name: {{ .Release.Name }}-config
                   key: POSTGRES_DB
+
             - name: POSTGRES_USER
               valueFrom:
                 configMapKeyRef:
                   name: {{ .Release.Name }}-config
                   key: POSTGRES_USER
+
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-secret
+                  name: {{ .Values.database.existingSecret | quote }}
                   key: POSTGRES_PASSWORD
+
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
+
           resources:
             {{- toYaml .Values.postgresResources | nindent 12 }}
+
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
+
           readinessProbe:
             exec:
               command:
@@ -60,6 +76,7 @@ spec:
                 - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
             initialDelaySeconds: 5
             periodSeconds: 5
+
           livenessProbe:
             exec:
               command:
@@ -68,6 +85,7 @@ spec:
                 - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
             initialDelaySeconds: 20
             periodSeconds: 10
+
   volumeClaimTemplates:
     - metadata:
         name: postgres-storage

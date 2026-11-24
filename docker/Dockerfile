@@ -1,4 +1,3 @@
-
 # Builder
 FROM python:3.12.16-slim-trixie AS builder
 
@@ -10,27 +9,37 @@ RUN python -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir \
        -r requirements.txt
 
-
 # Runtime
 FROM python:3.12.16-slim-trixie AS runtime
 
+ARG APP_VERSION=0.4.0
+
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    APP_VERSION=${APP_VERSION}
+
+LABEL org.opencontainers.image.title="NEXO"
+LABEL org.opencontainers.image.version="${APP_VERSION}"
+LABEL org.opencontainers.image.source="https://github.com/amandaseara/nexo"
 
 WORKDIR /app
 
-RUN groupadd --system nexo \
-    && useradd --system --gid nexo \
-       --home-dir /app nexo
+RUN groupadd --gid 10001 nexo \
+    && useradd --uid 10001 \
+       --gid 10001 \
+       --home-dir /app \
+       --no-create-home \
+       --shell /usr/sbin/nologin \
+       nexo
 
 COPY --from=builder /opt/venv /opt/venv
 
-COPY --chown=nexo:nexo app/ ./app/
-COPY --chown=nexo:nexo migrations/ ./migrations/
-COPY --chown=nexo:nexo alembic.ini ./alembic.ini
+COPY --chown=10001:10001 app/ ./app/
+COPY --chown=10001:10001 migrations/ ./migrations/
+COPY --chown=10001:10001 alembic.ini ./alembic.ini
 
-USER nexo
+USER 10001:10001
 
 EXPOSE 8000
 
