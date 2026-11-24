@@ -1,0 +1,42 @@
+# Grafana: comprobación vía HTTP API (generado 2026-11-24 17:05:17 -03)
+# kubectl port-forward -n monitoring svc/monitoring-grafana 13000:80 ; auth con el usuario/contraseña del Secret grafana-admin (no se incluyen aquí)
+
+## GET /api/health
+{
+  "database": "ok",
+  "version": "13.3.1",
+  "commit": "da3aa3ff574e7dbbf808c66b6daa744defed0441"
+}
+
+## GET /api/datasources (nombre, tipo, uid, url)
+Alertmanager alertmanager alertmanager http://monitoring-kube-prometheus-alertmanager.monitoring:9093/
+Prometheus prometheus prometheus http://monitoring-kube-prometheus-prometheus.monitoring:9090/
+
+## GET /api/search?query=NEXO
+nexo-overview | NEXO - Visión general | /d/nexo-overview/nexo-vision-general
+
+## GET /api/dashboards/uid/nexo-overview
+uid: nexo-overview
+title: NEXO - Visión general
+provisioned: True | folder: General
+paneles (sin filas): 13
+  - 1 row | Resumen
+  - 2 stat | Peticiones por segundo (RPS)
+  - 3 stat | Latencia media
+  - 4 stat | Tasa de errores 5xx
+  - 5 stat | Pedidos confirmados
+  - 6 stat | Facturación
+  - 7 row | Tráfico y latencia
+  - 8 timeseries | RPS por endpoint
+  - 9 timeseries | Latencia de respuesta (media y p95)
+  - 10 timeseries | Peticiones por código de estado
+  - 11 timeseries | Latencia media por endpoint
+  - 12 row | Recursos por pod
+  - 13 timeseries | Uso de CPU por pod
+  - 14 timeseries | Uso de memoria por pod
+  - 15 row | Negocio
+  - 16 timeseries | Pedidos por minuto
+  - 17 timeseries | Facturación y unidades vendidas por minuto
+
+## Datasource proxy: consulta a Prometheus a través de Grafana
+status: success | sum(nexo_orders_created_total) = 518

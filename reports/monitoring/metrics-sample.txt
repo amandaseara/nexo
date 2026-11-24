@@ -1,0 +1,113 @@
+# Muestra de GET /metrics de la API NEXO (generado 2026-11-24 17:04:10 -03)
+# kubectl port-forward -n nexo svc/nexo-api 18000:8000 ; curl http://localhost:18000/metrics
+# Imagen desplegada: nexo-api:local-36f6f2b-dirty06bf20f4
+
+## GET /health
+{"status":"healthy","application":"NEXO","version":"0.4.0"}
+## GET /health/ready
+{"status":"ready","application":"NEXO","database":"connected"}
+
+## GET /metrics (solo métricas nexo_*)
+# HELP nexo_http_requests_total Peticiones HTTP procesadas.
+# TYPE nexo_http_requests_total counter
+nexo_http_requests_total{handler="/health/ready",method="GET",status="200"} 30.0
+nexo_http_requests_total{handler="/health",method="GET",status="200"} 16.0
+nexo_http_requests_total{handler="/products",method="POST",status="201"} 5.0
+nexo_http_requests_total{handler="/orders",method="POST",status="201"} 158.0
+nexo_http_requests_total{handler="/orders",method="POST",status="409"} 27.0
+nexo_http_requests_total{handler="/inventory/{product_id}",method="GET",status="200"} 33.0
+nexo_http_requests_total{handler="/orders/{order_id}",method="GET",status="404"} 15.0
+nexo_http_requests_total{handler="/products",method="GET",status="200"} 72.0
+nexo_http_requests_total{handler="/orders",method="GET",status="200"} 40.0
+nexo_http_requests_total{handler="/orders",method="POST",status="404"} 12.0
+nexo_http_requests_total{handler="/inventory/{product_id}/adjust",method="POST",status="200"} 28.0
+# HELP nexo_http_requests_created Peticiones HTTP procesadas.
+# TYPE nexo_http_requests_created gauge
+nexo_http_requests_created{handler="/health/ready",method="GET",status="200"} 1.7955505138436663e+09
+nexo_http_requests_created{handler="/health",method="GET",status="200"} 1.795550528164897e+09
+nexo_http_requests_created{handler="/products",method="POST",status="201"} 1.7955506206763654e+09
+nexo_http_requests_created{handler="/orders",method="POST",status="201"} 1.7955506207711027e+09
+nexo_http_requests_created{handler="/orders",method="POST",status="409"} 1.7955506208041139e+09
+nexo_http_requests_created{handler="/inventory/{product_id}",method="GET",status="200"} 1.795550620829175e+09
+nexo_http_requests_created{handler="/orders/{order_id}",method="GET",status="404"} 1.795550620886535e+09
+nexo_http_requests_created{handler="/products",method="GET",status="200"} 1.795550620983778e+09
+nexo_http_requests_created{handler="/orders",method="GET",status="200"} 1.7955506212309365e+09
+nexo_http_requests_created{handler="/orders",method="POST",status="404"} 1.7955506214816535e+09
+nexo_http_requests_created{handler="/inventory/{product_id}/adjust",method="POST",status="200"} 1.7955506217162924e+09
+# HELP nexo_http_request_duration_seconds Latencia de las peticiones HTTP en segundos.
+# TYPE nexo_http_request_duration_seconds histogram
+nexo_http_request_duration_seconds_count{handler="/health/ready",method="GET"} 30.0
+nexo_http_request_duration_seconds_sum{handler="/health/ready",method="GET"} 0.04798125299987532
+nexo_http_request_duration_seconds_count{handler="/health",method="GET"} 16.0
+nexo_http_request_duration_seconds_sum{handler="/health",method="GET"} 0.006677041999978428
+nexo_http_request_duration_seconds_count{handler="/products",method="POST"} 5.0
+nexo_http_request_duration_seconds_sum{handler="/products",method="POST"} 0.021276917000022877
+nexo_http_request_duration_seconds_count{handler="/orders",method="POST"} 197.0
+nexo_http_request_duration_seconds_sum{handler="/orders",method="POST"} 0.7446408290001045
+nexo_http_request_duration_seconds_count{handler="/inventory/{product_id}",method="GET"} 33.0
+nexo_http_request_duration_seconds_sum{handler="/inventory/{product_id}",method="GET"} 0.0370762510002578
+nexo_http_request_duration_seconds_count{handler="/orders/{order_id}",method="GET"} 15.0
+nexo_http_request_duration_seconds_sum{handler="/orders/{order_id}",method="GET"} 0.017426207999960752
+nexo_http_request_duration_seconds_count{handler="/products",method="GET"} 72.0
+nexo_http_request_duration_seconds_sum{handler="/products",method="GET"} 0.12152846299989051
+nexo_http_request_duration_seconds_count{handler="/orders",method="GET"} 40.0
+nexo_http_request_duration_seconds_sum{handler="/orders",method="GET"} 0.10513812600026995
+nexo_http_request_duration_seconds_count{handler="/inventory/{product_id}/adjust",method="POST"} 28.0
+nexo_http_request_duration_seconds_sum{handler="/inventory/{product_id}/adjust",method="POST"} 0.0737185010000303
+# HELP nexo_http_request_duration_seconds_created Latencia de las peticiones HTTP en segundos.
+# TYPE nexo_http_request_duration_seconds_created gauge
+nexo_http_request_duration_seconds_created{handler="/health/ready",method="GET"} 1.7955505138436327e+09
+nexo_http_request_duration_seconds_created{handler="/health",method="GET"} 1.795550528164861e+09
+nexo_http_request_duration_seconds_created{handler="/products",method="POST"} 1.7955506206763463e+09
+nexo_http_request_duration_seconds_created{handler="/orders",method="POST"} 1.795550620771088e+09
+nexo_http_request_duration_seconds_created{handler="/inventory/{product_id}",method="GET"} 1.795550620829143e+09
+nexo_http_request_duration_seconds_created{handler="/orders/{order_id}",method="GET"} 1.7955506208865175e+09
+nexo_http_request_duration_seconds_created{handler="/products",method="GET"} 1.7955506209837587e+09
+nexo_http_request_duration_seconds_created{handler="/orders",method="GET"} 1.7955506212309053e+09
+nexo_http_request_duration_seconds_created{handler="/inventory/{product_id}/adjust",method="POST"} 1.7955506217162676e+09
+# HELP nexo_http_requests_in_progress Peticiones HTTP en curso.
+# TYPE nexo_http_requests_in_progress gauge
+nexo_http_requests_in_progress 1.0
+# HELP nexo_orders_created_total Pedidos confirmados.
+# TYPE nexo_orders_created_total counter
+nexo_orders_created_total 158.0
+# HELP nexo_orders_created_created Pedidos confirmados.
+# TYPE nexo_orders_created_created gauge
+nexo_orders_created_created 1.7955505026608973e+09
+# HELP nexo_order_revenue_total Importe acumulado de los pedidos confirmados.
+# TYPE nexo_order_revenue_total counter
+nexo_order_revenue_total 21229.0
+# HELP nexo_order_revenue_created Importe acumulado de los pedidos confirmados.
+# TYPE nexo_order_revenue_created gauge
+nexo_order_revenue_created 1.7955505026609015e+09
+# HELP nexo_order_items_sold_total Unidades vendidas en pedidos confirmados.
+# TYPE nexo_order_items_sold_total counter
+nexo_order_items_sold_total 320.0
+# HELP nexo_order_items_sold_created Unidades vendidas en pedidos confirmados.
+# TYPE nexo_order_items_sold_created gauge
+nexo_order_items_sold_created 1.7955505026609046e+09
+# HELP nexo_orders_rejected_total Pedidos rechazados, por motivo.
+# TYPE nexo_orders_rejected_total counter
+nexo_orders_rejected_total{reason="insufficient_stock"} 27.0
+nexo_orders_rejected_total{reason="product_not_found"} 12.0
+# HELP nexo_orders_rejected_created Pedidos rechazados, por motivo.
+# TYPE nexo_orders_rejected_created gauge
+nexo_orders_rejected_created{reason="insufficient_stock"} 1.7955506208038695e+09
+nexo_orders_rejected_created{reason="product_not_found"} 1.7955506214813852e+09
+
+## Ejemplo de buckets del histograma (POST /orders)
+
+## Prometheus: nexo_http_requests_total (consulta instantánea, top 10)
+nexo_http_requests_total POST /orders status=201 pod=nexo-api-677c5f7454-j6kwc -> 106
+nexo_http_requests_total GET /products status=200 pod=nexo-api-677c5f7454-j6kwc -> 45
+nexo_http_requests_total GET /orders status=200 pod=nexo-api-677c5f7454-j6kwc -> 30
+nexo_http_requests_total GET /health/ready status=200 pod=nexo-api-677c5f7454-j6kwc -> 27
+nexo_http_requests_total GET /inventory/{product_id} status=200 pod=nexo-api-677c5f7454-j6kwc -> 21
+nexo_http_requests_total POST /inventory/{product_id}/adjust status=200 pod=nexo-api-677c5f7454-j6kwc -> 16
+nexo_http_requests_total GET /health status=200 pod=nexo-api-677c5f7454-j6kwc -> 14
+nexo_http_requests_total POST /orders status=409 pod=nexo-api-677c5f7454-j6kwc -> 14
+nexo_http_requests_total POST /orders status=404 pod=nexo-api-677c5f7454-j6kwc -> 9
+nexo_http_requests_total GET /orders/{order_id} status=404 pod=nexo-api-677c5f7454-j6kwc -> 8
+
+## Prometheus: nexo_orders_created_total
+nexo_orders_created_total namespace=nexo pod=nexo-api-677c5f7454-j6kwc job=nexo-api -> 106

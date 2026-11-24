@@ -47,7 +47,9 @@ done
     echo "--- Chart de NEXO (helm template + kubectl apply --dry-run=server) ---"
     echo "El dry-run en el servidor pasa por el webhook de Kyverno sin crear nada."
 } >> "$LOG"
-chart_output=$(helm template nexo ./helm-chart --namespace nexo \
+# Release con otro nombre: si NEXO ya está desplegado, el dry-run validaría
+# objetos nuevos en vez de intentar modificar el Job de migraciones (inmutable).
+chart_output=$(helm template nexo-policy-check ./helm-chart --namespace nexo \
         -f helm-chart/values.yaml -f helm-chart/values-dev.yaml \
     | kubectl apply --dry-run=server -f - 2>&1)
 if [ $? -eq 0 ]; then

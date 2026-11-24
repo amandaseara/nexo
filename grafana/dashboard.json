@@ -573,7 +573,7 @@
       "id": 13,
       "type": "timeseries",
       "title": "Uso de CPU por pod",
-      "description": "CPU consumida por el contenedor api de cada pod (cores) frente a su límite.",
+      "description": "CPU consumida por cada pod de la API (cores, cgroup del pod) frente al límite del contenedor.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -590,7 +590,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container=\"api\"}[$__rate_interval]))",
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\".+-api-.+\", container=\"\"}[$__rate_interval]))",
           "legendFormat": "{{pod}}",
           "refId": "A",
           "range": true
@@ -640,7 +640,7 @@
       "id": 14,
       "type": "timeseries",
       "title": "Uso de memoria por pod",
-      "description": "Memoria en uso (working set) del contenedor api de cada pod frente a su límite.",
+      "description": "Memoria en uso (working set, cgroup del pod) de cada pod de la API frente al límite del contenedor.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -657,7 +657,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", container=\"api\"})",
+          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\".+-api-.+\", container=\"\"})",
           "legendFormat": "{{pod}}",
           "refId": "A",
           "range": true

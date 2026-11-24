@@ -1,0 +1,37 @@
+# Pods (generado 2026-11-24 17:05:28 -03)
+# Minikube v1.39.0 | node: v1.35.1 runtime=docker://29.7.2 | 4 CPU / 6144 MB
+# Helm v4.3.2+g8346aaa
+
+## helm list -n nexo / -n monitoring
+NAME	NAMESPACE	REVISION	UPDATED                             	STATUS  	CHART     	APP VERSION
+nexo	nexo     	1       	2026-11-24 17:00:18.073156 -0300 -03	deployed	nexo-0.2.0	0.4.0      
+NAME      	NAMESPACE 	REVISION	UPDATED                             	STATUS  	CHART                       	APP VERSION
+monitoring	monitoring	2       	2026-11-24 17:03:47.574348 -0300 -03	deployed	kube-prometheus-stack-93.9.0	v0.95.2    
+
+## kubectl get pods -n nexo -o wide
+NAME                        READY   STATUS      RESTARTS   AGE     IP            NODE       NOMINATED NODE   READINESS GATES
+nexo-api-677c5f7454-j6kwc   1/1     Running     0          5m10s   10.244.0.9    minikube   <none>           <none>
+nexo-migrations-1-mc4vh     0/1     Completed   0          5m10s   10.244.0.10   minikube   <none>           <none>
+nexo-postgres-0             1/1     Running     0          5m10s   10.244.0.11   minikube   <none>           <none>
+
+## Imagen y readiness de la API
+image=nexo-api:local-36f6f2b-dirty06bf20f4 pullPolicy=Never ready=1/1
+
+## kubectl get pods -n monitoring -o wide
+NAME                                                   READY   STATUS    RESTARTS   AGE     IP             NODE       NOMINATED NODE   READINESS GATES
+monitoring-grafana-58c56f4b8d-qf6fm                    3/3     Running   0          96s     10.244.0.21    minikube   <none>           <none>
+monitoring-kube-prometheus-operator-59b48c7bd8-v68lm   1/1     Running   0          5m16s   10.244.0.6     minikube   <none>           <none>
+monitoring-kube-state-metrics-58bbcf444b-bs9ws         1/1     Running   0          5m16s   10.244.0.7     minikube   <none>           <none>
+monitoring-prometheus-node-exporter-m5h4l              1/1     Running   0          5m16s   192.168.49.2   minikube   <none>           <none>
+prometheus-monitoring-kube-prometheus-prometheus-0     2/2     Running   0          5m12s   10.244.0.8     minikube   <none>           <none>
+
+## kubectl top pod -n nexo --containers (metrics-server)
+POD                         NAME       CPU(cores)   MEMORY(bytes)   
+nexo-api-677c5f7454-j6kwc   api        44m          76Mi            
+nexo-postgres-0             postgres   14m          46Mi            
+
+## Eventos Warning en nexo (ghcr-secret no existe: aviso inocuo, la imagen es local con pullPolicy=Never)
+REASON                            OBJECT                      MESSAGE
+FailedToRetrieveImagePullSecret   nexo-api-677c5f7454-j6kwc   Unable to retrieve some image pull secrets (ghcr-secret); attempting to pull the image may not succeed.
+FailedToRetrieveImagePullSecret   nexo-migrations-1-mc4vh     Unable to retrieve some image pull secrets (ghcr-secret); attempting to pull the image may not succeed.
+FailedScheduling                  nexo-postgres-0             0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. not found

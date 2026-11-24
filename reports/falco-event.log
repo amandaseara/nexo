@@ -1,4 +1,4 @@
-=== Evento de Falco: 2026-11-24 16:54:56 -0300 ===
+=== Evento de Falco: 2026-11-24 17:06:25 -0300 ===
 
 Acción ejecutada:
   kubectl apply -f k8s/falco/falco-test-pod.yaml
@@ -17,4 +17,5 @@ Descripción:
   el pod terminó normalmente.
 
 Alerta registrada por Falco:
-08:22:52.796533808: Warning Grep private keys or passwords activities found | evt_type=execve user=<NA> user_uid=1000 user_loginuid=-1 process=find proc_exepath=/bin/find parent=containerd-shim command=find /etc /home -name id_rsa terminal=0 exe_flags=EXE_LOWER_LAYER container_id=1e8be6d245d3 container_name=k8s_key-search_falco-test_nexo_cca0ea22-8c29-4d62-99b5-926c991c2853_0 container_image_repository=busybox container_image_tag=1.36 k8s_pod_name=falco-test k8s_ns_name=nexo
+20:05:07.131990867: Warning Grep private keys or passwords activities found | evt_type=execve user=<NA> user_uid=1000 user_loginuid=-1 process=find proc_exepath=/bin/find parent=containerd-shim command=find /etc /home -name id_rsa terminal=0 exe_flags=EXE_LOWER_LAYER container_id=db3bc726435b container_name=<NA> container_image_repository=<NA> container_image_tag=<NA> k8s_pod_name=<NA> k8s_ns_name=<NA>
+20:06:14.041224231: Warning Grep private keys or passwords activities found | evt_type=execve user=<NA> user_uid=1000 user_loginuid=-1 process=find proc_exepath=/bin/find parent=containerd-shim command=find /etc /home -name id_rsa terminal=0 exe_flags=EXE_LOWER_LAYER container_id=3c0370539968 container_name=k8s_key-search_falco-test_nexo_10c6b072-1493-4f49-b0a9-8155796846cc_0 container_image_repository=busybox container_image_tag=1.36 k8s_pod_name=falco-test k8s_ns_name=nexo

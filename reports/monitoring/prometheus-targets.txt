@@ -1,0 +1,29 @@
+# Prometheus targets (generado 2026-11-24 17:03:58 -03)
+# Fuente: GET /api/v1/targets?state=active (port-forward svc/monitoring-kube-prometheus-prometheus)
+
+unknown serviceMonitor/monitoring/monitoring-grafana/0                 http://10.244.0.21:3000/metrics  lastError=-
+up    serviceMonitor/monitoring/monitoring-grafana/0                 http://10.244.0.17:3000/metrics  lastError=-
+up    serviceMonitor/monitoring/monitoring-kube-prometheus-apiserver/0 https://192.168.49.2:8443/metrics  lastError=-
+up    serviceMonitor/monitoring/monitoring-kube-prometheus-coredns/0 http://10.244.0.3:9153/metrics  lastError=-
+up    serviceMonitor/monitoring/monitoring-kube-prometheus-kubelet/0 https://192.168.49.2:10250/metrics  lastError=-
+up    serviceMonitor/monitoring/monitoring-kube-prometheus-kubelet/1 https://192.168.49.2:10250/metrics/cadvisor  lastError=-
+up    serviceMonitor/monitoring/monitoring-kube-prometheus-kubelet/2 https://192.168.49.2:10250/metrics/probes  lastError=-
+up    serviceMonitor/monitoring/monitoring-kube-prometheus-operator/0 https://10.244.0.6:10250/metrics  lastError=-
+up    serviceMonitor/monitoring/monitoring-kube-prometheus-prometheus/0 http://10.244.0.8:9090/metrics  lastError=-
+up    serviceMonitor/monitoring/monitoring-kube-prometheus-prometheus/1 http://10.244.0.8:8080/metrics  lastError=-
+up    serviceMonitor/monitoring/monitoring-kube-state-metrics/0      http://10.244.0.7:8080/metrics  lastError=-
+up    serviceMonitor/monitoring/monitoring-prometheus-node-exporter/0 http://192.168.49.2:9100/metrics  lastError=-
+up    serviceMonitor/nexo/nexo-api/0                                 http://10.244.0.9:8000/metrics  lastError=-
+
+## Target de NEXO (scrapePool=serviceMonitor/nexo/nexo-api/0)
+"job": "serviceMonitor/nexo/nexo-api/0"
+"job": "nexo-api",
+"namespace": "nexo",
+"pod": "nexo-api-677c5f7454-j6kwc",
+"service": "nexo-api"
+"scrapePool": "serviceMonitor/nexo/nexo-api/0",
+"scrapeUrl": "http://10.244.0.9:8000/metrics",
+"lastError": "",
+"lastScrape": "2026-11-24T20:03:44.936131093Z",
+"lastScrapeDuration": 0.002549875,
+"health": "up",

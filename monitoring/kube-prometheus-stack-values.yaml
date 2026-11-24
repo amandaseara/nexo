@@ -83,10 +83,12 @@ grafana:
         cpu: 100m
         memory: 128Mi
   defaultDashboardsTimezone: browser
+  # Grafana 13 supera 256Mi al arrancar (índice de búsqueda + plugins):
+  # con 256Mi el contenedor acaba OOMKilled.
   resources:
     requests:
       cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 300m
       memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

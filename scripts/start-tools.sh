@@ -13,7 +13,16 @@ echo "      Docker listo."
 
 echo "[2/3] Minikube..."
 if ! minikube status >/dev/null 2>&1; then
-    minikube start --cpus="${MINIKUBE_CPUS:-4}" --memory="${MINIKUBE_MEMORY:-7g}"
+    # En Apple M6 / macOS 27 "minikube start" falla al leer la CPU del host;
+    # si existe la librería de compatibilidad local, se usa solo para este comando.
+    SHIM="${HOME}/.minikube-m6-shim/libminikube-m6-shim.dylib"
+    if [[ -f $SHIM ]]; then
+        DYLD_INSERT_LIBRARIES="$SHIM" minikube start --container-runtime=docker \
+            --cpus="${MINIKUBE_CPUS:-4}" --memory="${MINIKUBE_MEMORY:-6g}"
+    else
+        minikube start --container-runtime=docker \
+            --cpus="${MINIKUBE_CPUS:-4}" --memory="${MINIKUBE_MEMORY:-6g}"
+    fi
 fi
 minikube addons enable metrics-server >/dev/null 2>&1 || true
 kubectl config use-context minikube >/dev/null

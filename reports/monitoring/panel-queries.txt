@@ -1,0 +1,99 @@
+# Consultas PromQL de los paneles de grafana/dashboard.json (generado 2026-11-24 17:06:24 -03)
+# Sustituciones: $namespace=nexo  $__rate_interval=1m  $__range=30m
+# Ejecutadas como consulta instantánea contra Prometheus (/api/v1/query) justo después de
+# scripts/generate-traffic.sh http://localhost:18000 150  ->  Fin: 1847 peticiones, 830 pedidos confirmados, 152 rechazados.
+
+[OK   ] panel 2 "Peticiones por segundo (RPS)" (stat) ref A
+        query : sum(rate(nexo_http_requests_total{namespace="nexo"}[1m]))
+        result: {} = 10.978
+[OK   ] panel 3 "Latencia media" (stat) ref A
+        query : sum(rate(nexo_http_request_duration_seconds_sum{namespace="nexo"}[1m])) / sum(rate(nexo_http_request_duration_seconds_count{namespace="nexo"}[1m]))
+        result: {} = 0.00466465
+[OK   ] panel 4 "Tasa de errores 5xx" (stat) ref A
+        query : sum(rate(nexo_http_requests_total{namespace="nexo", status=~"5.."}[1m])) / sum(rate(nexo_http_requests_total{namespace="nexo"}[1m])) or vector(0)
+        result: {} = 0
+[OK   ] panel 5 "Pedidos confirmados" (stat) ref A
+        query : sum(increase(nexo_orders_created_total{namespace="nexo"}[30m]))
+        result: {} = 860.341
+[OK   ] panel 6 "Facturación" (stat) ref A
+        query : sum(increase(nexo_order_revenue_total{namespace="nexo"}[30m]))
+        result: {} = 109062
+[OK   ] panel 8 "RPS por endpoint" (timeseries) ref A
+        query : sum by (method, handler) (rate(nexo_http_requests_total{namespace="nexo"}[1m]))
+        result: {'handler': '/health/ready', 'method': 'GET'} = 0.200004
+        result: {'handler': '/health', 'method': 'GET'} = 0.0888909
+        result: {'handler': '/products', 'method': 'POST'} = 0
+        result: {'handler': '/orders', 'method': 'POST'} = 5.84457
+        result: {'handler': '/inventory/{product_id}', 'method': 'GET'} = 1.13336
+        result: {'handler': '/orders/{order_id}', 'method': 'GET'} = 0.555568
+        ... (9 series en total)
+[OK   ] panel 9 "Latencia de respuesta (media y p95)" (timeseries) ref A
+        query : sum(rate(nexo_http_request_duration_seconds_sum{namespace="nexo"}[1m])) / sum(rate(nexo_http_request_duration_seconds_count{namespace="nexo"}[1m]))
+        result: {} = 0.00466465
+[OK   ] panel 9 "Latencia de respuesta (media y p95)" (timeseries) ref B
+        query : histogram_quantile(0.95, sum by (le) (rate(nexo_http_request_duration_seconds_bucket{namespace="nexo"}[1m])))
+        result: {} = 0.0169857
+[OK   ] panel 10 "Peticiones por código de estado" (timeseries) ref A
+        query : sum by (status) (rate(nexo_http_requests_total{namespace="nexo"}[1m]))
+        result: {'status': '200'} = 4.57788
+        result: {'status': '201'} = 5.00011
+        result: {'status': '409'} = 0.466677
+        result: {'status': '404'} = 0.933354
+[OK   ] panel 11 "Latencia media por endpoint" (timeseries) ref A
+        query : sum by (handler) (rate(nexo_http_request_duration_seconds_sum{namespace="nexo"}[1m])) / sum by (handler) (rate(nexo_http_request_duration_seconds_count{namespace="nexo"}[1m]))
+        result: {'handler': '/health/ready'} = 0.00118519
+        result: {'handler': '/health'} = 0.000220208
+        result: {'handler': '/products'} = 0.00216859
+        result: {'handler': '/orders'} = 0.0063594
+        result: {'handler': '/inventory/{product_id}'} = 0.00140196
+        result: {'handler': '/orders/{order_id}'} = 0.00140326
+        ... (7 series en total)
+[VACIO] panel 13 "Uso de CPU por pod" (timeseries) ref A
+        query : sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="nexo", container="api"}[1m]))
+        result: sin series (status=success )
+[OK   ] panel 13 "Uso de CPU por pod" (timeseries) ref B
+        query : max(kube_pod_container_resource_limits{namespace="nexo", container="api", resource="cpu"})
+        result: {} = 0.5
+[VACIO] panel 14 "Uso de memoria por pod" (timeseries) ref A
+        query : sum by (pod) (container_memory_working_set_bytes{namespace="nexo", container="api"})
+        result: sin series (status=success )
+[OK   ] panel 14 "Uso de memoria por pod" (timeseries) ref B
+        query : max(kube_pod_container_resource_limits{namespace="nexo", container="api", resource="memory"})
+        result: {} = 5.36871e+08
+[OK   ] panel 16 "Pedidos por minuto" (timeseries) ref A
+        query : sum(rate(nexo_orders_created_total{namespace="nexo"}[1m])) * 60
+        result: {} = 300.007
+[OK   ] panel 16 "Pedidos por minuto" (timeseries) ref B
+        query : sum by (reason) (rate(nexo_orders_rejected_total{namespace="nexo"}[1m])) * 60
+        result: {'reason': 'insufficient_stock'} = 28.0006
+        result: {'reason': 'product_not_found'} = 22.6672
+[OK   ] panel 17 "Facturación y unidades vendidas por minuto" (timeseries) ref A
+        query : sum(rate(nexo_order_revenue_total{namespace="nexo"}[1m])) * 60
+        result: {} = 35483.5
+[OK   ] panel 17 "Facturación y unidades vendidas por minuto" (timeseries) ref B
+        query : sum(rate(nexo_order_items_sold_total{namespace="nexo"}[1m])) * 60
+        result: {} = 570.679
+
+Resumen: 16 consultas con datos, 2 vacías
+
+## Causa de las consultas vacías (paneles 13A y 14A: CPU / memoria por pod)
+El clúster usa el runtime "docker" (cri-dockerd). El cAdvisor integrado en el
+kubelet (k8s >= 1.24) ya no tiene factoría Docker (solo systemd/containerd/crio,
+ver journal del kubelet), así que no puede asociar los cgroups de cada
+contenedor a su pod: esas series salen con container="", pod="", namespace="".
+Solo el cgroup a nivel de pod (id=/kubepods/<qos>/pod<uid>) lleva namespace y pod.
+Por eso cualquier filtro container="api" devuelve vacío en este entorno.
+
+## Evidencia: series de cAdvisor en el namespace nexo (no hay etiqueta container)
+   {'namespace': 'nexo', 'pod': 'nexo-api-677c5f7454-j6kwc', 'container': '', 'id': '/kubepods/burstable/pode6510262-d6e5-47b9-b3bd-b88960be4892'}
+   {'namespace': 'nexo', 'pod': 'nexo-postgres-0', 'container': '', 'id': '/kubepods/burstable/poded4a0a71-bb21-4537-bbbb-6b4c2eefa275'}
+
+## Consultas alternativas verificadas (a nivel de pod; funcionan con docker y con containerd)
+  query : sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="nexo", pod=~".+-api-.+", container=""}[1m]))
+  result: {'pod': 'nexo-api-677c5f7454-j6kwc'} = 0.044099990695077695
+  query : sum by (pod) (container_memory_working_set_bytes{namespace="nexo", pod=~".+-api-.+", container=""})
+  result: {'pod': 'nexo-api-677c5f7454-j6kwc'} = 80064512
+  (contraste: kubectl top pod -n nexo --containers)
+    POD                         NAME       CPU(cores)   MEMORY(bytes)   
+    nexo-api-677c5f7454-j6kwc   api        54m          77Mi            
+    nexo-postgres-0             postgres   15m          48Mi            

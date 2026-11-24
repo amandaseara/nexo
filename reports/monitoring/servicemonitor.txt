@@ -1,0 +1,27 @@
+# ServiceMonitor de NEXO (generado 2026-11-24 17:05:28 -03)
+
+## kubectl get servicemonitor -n nexo
+NAME       AGE
+nexo-api   5m10s
+
+## kubectl get servicemonitor nexo-api -n nexo -o yaml (spec + labels)
+{"app":"nexo-api","app.kubernetes.io/managed-by":"Helm","release":"monitoring"}
+spec:
+  endpoints:
+  - interval: 15s
+    path: /metrics
+    port: http
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - nexo
+  selector:
+    matchLabels:
+      app: nexo
+      app.kubernetes.io/component: api
+
+## Service seleccionado (labels) y endpoints
+NAME       TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE     LABELS
+nexo-api   ClusterIP   10.102.237.173   <none>        8000/TCP   5m10s   app.kubernetes.io/component=api,app.kubernetes.io/managed-by=Helm,app=nexo
+NAME             ADDRESSTYPE   PORTS   ENDPOINTS    AGE
+nexo-api-lqdxg   IPv4          8000    10.244.0.9   5m10s

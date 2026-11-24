@@ -1,11 +1,11 @@
-=== Validación de políticas Kyverno: 2026-11-24 16:54:03 -0300 ===
+=== Validación de políticas Kyverno: 2026-11-24 17:05:32 -0300 ===
 
 --- Políticas instaladas ---
-NAME                      AGE     READY
-disallow-latest-tag       4m59s   true
-require-requests-limits   4m59s   true
-require-run-as-non-root   4m59s   true
-require-probes            4m59s   true
+NAME                      AGE   READY
+disallow-latest-tag       73s   true
+require-requests-limits   73s   true
+require-run-as-non-root   73s   true
+require-probes            73s   true
 
 --- 00-good-pod.yaml ---
 # CUMPLE las 4 políticas: tiene que ser ADMITIDO.
@@ -45,12 +45,12 @@ Esperado: RECHAZADO | Resultado: RECHAZADO | OK
 
 --- Chart de NEXO (helm template + kubectl apply --dry-run=server) ---
 El dry-run en el servidor pasa por el webhook de Kyverno sin crear nada.
-configmap/nexo-config created (server dry run)
-service/nexo-api created (server dry run)
-service/nexo-postgres created (server dry run)
-deployment.apps/nexo-api created (server dry run)
-statefulset.apps/nexo-postgres created (server dry run)
-job.batch/nexo-migrations-1 created (server dry run)
+configmap/nexo-policy-check-config created (server dry run)
+service/nexo-policy-check-api created (server dry run)
+service/nexo-policy-check-postgres created (server dry run)
+deployment.apps/nexo-policy-check-api created (server dry run)
+statefulset.apps/nexo-policy-check-postgres created (server dry run)
+job.batch/nexo-policy-check-migrations-1 created (server dry run)
 Esperado: ADMITIDO | OK
 
 === Resumen: 7 OK, 0 con error ===
