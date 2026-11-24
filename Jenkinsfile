@@ -421,7 +421,7 @@ pipeline {
                         --set-string image.repository="${IMAGE_NAME}" \
                         --set-string image.tag="${IMAGE_TAG}" \
                         --set-string database.existingSecret="${DB_SECRET_NAME}" \
-                        --atomic \
+                        --rollback-on-failure \
                         --wait \
                         --wait-for-jobs \
                         --timeout 10m \
