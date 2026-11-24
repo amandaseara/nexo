@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Abre todo lo necesario para la demo: comprueba el clúster, abre los
-# port-forward y abre en el navegador la API, Grafana, Prometheus y Jenkins.
+# Deja la demo lista y la abre:
+#   - arranca Docker, Minikube y Jenkins si están parados
+#   - instala lo que falte en el clúster (monitorización, Kyverno/Falco, NEXO)
+#   - abre los port-forward y las pestañas de la API, Grafana, Prometheus y Jenkins
 # Uso: scripts/open-demo.sh
 set -euo pipefail
 
@@ -11,6 +13,38 @@ if ! kubectl get nodes >/dev/null 2>&1; then
     "$DIR/start-tools.sh"
 fi
 brew services start jenkins-lts >/dev/null 2>&1 || true
+
+ROOT="$(cd "$DIR/.." && pwd)"
+cd "$ROOT"
+
+installed() {  # release namespace
+    helm status "$1" -n "$2" >/dev/null 2>&1
+}
+
+if installed monitoring monitoring; then
+    echo "[OK] Prometheus + Grafana"
+else
+    echo "[..] Falta Prometheus + Grafana: instalando..."
+    "$DIR/monitoring-up.sh"
+fi
+
+if installed kyverno kyverno && installed falco falco \
+   && [[ $(kubectl get validatingpolicy --no-headers 2>/dev/null | wc -l) -ge 4 ]]; then
+    echo "[OK] Kyverno (4 políticas) + Falco"
+else
+    echo "[..] Falta Kyverno, Falco o las políticas: instalando..."
+    "$DIR/install-security.sh"
+fi
+
+if installed nexo nexo; then
+    echo "[OK] NEXO"
+else
+    echo "[..] Falta NEXO: desplegando..."
+    "$DIR/deploy-local.sh"
+fi
+
+echo "Esperando a que la API esté lista..."
+kubectl rollout status deployment/nexo-api -n nexo --timeout=180s
 
 "$DIR/port-forward.sh" start
 sleep 3
