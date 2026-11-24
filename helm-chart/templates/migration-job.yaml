@@ -6,55 +6,69 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}-migrations
+
 spec:
   backoffLimit: 3
   activeDeadlineSeconds: 300
   ttlSecondsAfterFinished: 300
+
   template:
     metadata:
       labels:
         app: {{ .Release.Name }}-migrations
+
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
+
       imagePullSecrets:
         - name: ghcr-secret
+
       securityContext:
         runAsNonRoot: true
-        runAsUser: 999
-        runAsGroup: 999
+        runAsUser: 10001
+        runAsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
+
       containers:
         - name: alembic
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           command:
             - sh
             - -c
             - |
+              set -e
+
               echo "Waiting for PostgreSQL..."
+
               for i in $(seq 1 60); do
                 if python -c "import os; from sqlalchemy import create_engine; e=create_engine(os.environ['DATABASE_URL'], connect_args={'connect_timeout': 5}); c=e.connect(); c.close(); e.dispose()" 2>/dev/null; then
                   echo "PostgreSQL is ready."
                   break
                 fi
+
                 if [ "$i" -eq 60 ]; then
                   echo "PostgreSQL connection timeout."
                   exit 1
                 fi
+
                 sleep 3
               done
 
               echo "Applying database migrations..."
               alembic upgrade head
               echo "Migration completed."
+
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-secret
+                  name: {{ .Values.database.existingSecret | quote }}
                   key: DATABASE_URL
+
           resources:
             requests:
               cpu: 100m
@@ -62,6 +76,7 @@ spec:
             limits:
               cpu: 300m
               memory: 256Mi
+
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

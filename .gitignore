@@ -6,7 +6,7 @@ __pycache__/
 .venv/
 venv/
 
-# Environment
+# Environment and secrets
 .env
 .env.*
 !.env.example
@@ -22,8 +22,22 @@ Thumbs.db
 # Reports generated locally
 *.log
 
+# Required DevSecOps evidence
+!reports/kyverno-validation.log
+!reports/falco-event.log
+
 # Terraform / Kubernetes local files
 .terraform/
 *.tfstate
 
+# Local backups
 backups/
+
+# Downloaded installers
+*.deb
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx

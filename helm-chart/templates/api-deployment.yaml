@@ -1,4 +1,3 @@
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,15 +5,19 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}-api
+
 spec:
   replicas: {{ .Values.replicaCount }}
+
   selector:
     matchLabels:
       app: {{ .Release.Name }}-api
+
   template:
     metadata:
       labels:
         app: {{ .Release.Name }}-api
+
     spec:
       automountServiceAccountToken: false
 
@@ -23,15 +26,17 @@ spec:
 
       securityContext:
         runAsNonRoot: true
-        runAsUser: 999
-        runAsGroup: 999
+        runAsUser: 10001
+        runAsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
 
+      {{- if .Values.migration.enabled }}
       initContainers:
         - name: wait-for-migrations
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           command:
             - sh
             - -c
@@ -46,17 +51,23 @@ spec:
               done
               echo "Migration timeout."
               exit 1
+
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-secret
+                  name: {{ .Values.database.existingSecret | quote }}
                   key: DATABASE_URL
+
+          resources:
+            {{- toYaml .Values.initContainerResources | nindent 12 }}
+
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
+      {{- end }}
 
       containers:
         - name: api
@@ -81,10 +92,13 @@ spec:
                   name: {{ .Release.Name }}-config
                   key: APP_ENV
 
+            - name: APP_VERSION
+              value: {{ .Chart.AppVersion | quote }}
+
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-secret
+                  name: {{ .Values.database.existingSecret | quote }}
                   key: DATABASE_URL
 
           readinessProbe:
