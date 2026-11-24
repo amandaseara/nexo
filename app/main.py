@@ -3,6 +3,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import engine
+from app.metrics import setup_metrics
 
 from app.routers.products import router as products_router
 from app.routers.orders import router as orders_router
@@ -15,6 +16,8 @@ app = FastAPI(
     ),
     version=settings.app_version,
 )
+
+setup_metrics(app)
 
 app.include_router(products_router)
 app.include_router(orders_router)

@@ -17,6 +17,12 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-api
+      {{- if .Values.metrics.enabled }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: {{ .Values.metrics.path | quote }}
+      {{- end }}
 
     spec:
       automountServiceAccountToken: false

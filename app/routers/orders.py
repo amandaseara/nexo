@@ -6,6 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.metrics import (
+    ORDER_ITEMS_SOLD,
+    ORDER_REVENUE,
+    ORDERS_CREATED,
+    ORDERS_REJECTED,
+)
 from app.models import Product, Inventory, Order, OrderItem
 from app.schemas.order import OrderCreate, OrderResponse
 
@@ -20,6 +26,7 @@ def create_order(data: OrderCreate, db: DBSession):
     product_ids = [item.product_id for item in data.items]
 
     if len(product_ids) != len(set(product_ids)):
+        ORDERS_REJECTED.labels("duplicate_products").inc()
         raise HTTPException(
             status_code=422,
             detail="No se permiten productos duplicados",
@@ -59,12 +66,14 @@ def create_order(data: OrderCreate, db: DBSession):
             inventory = inventories.get(product_id)
 
             if product is None or inventory is None:
+                ORDERS_REJECTED.labels("product_not_found").inc()
                 raise HTTPException(
                     status_code=404,
                     detail=f"Producto {product_id} no encontrado",
                 )
 
             if not product.active:
+                ORDERS_REJECTED.labels("product_inactive").inc()
                 raise HTTPException(
                     status_code=409,
                     detail=f"Producto {product_id} inactivo",
@@ -73,6 +82,7 @@ def create_order(data: OrderCreate, db: DBSession):
             quantity = requested_quantities[product_id]
 
             if inventory.quantity < quantity:
+                ORDERS_REJECTED.labels("insufficient_stock").inc()
                 raise HTTPException(
                     status_code=409,
                     detail=f"Stock insuficiente para {product.name}",
@@ -99,6 +109,10 @@ def create_order(data: OrderCreate, db: DBSession):
         db.add(order)
         db.commit()
         db.refresh(order)
+
+        ORDERS_CREATED.inc()
+        ORDER_REVENUE.inc(float(total))
+        ORDER_ITEMS_SOLD.inc(sum(requested_quantities.values()))
 
         return order
 

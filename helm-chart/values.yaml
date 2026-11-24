@@ -58,6 +58,19 @@ ingress:
   className: nginx
   host: nexo.local
 
+metrics:
+  # La API expone métricas Prometheus en este path
+  enabled: true
+  path: /metrics
+  serviceMonitor:
+    # Solo se crea si el clúster tiene la CRD de Prometheus Operator
+    # (la instala scripts/monitoring-up.sh con kube-prometheus-stack)
+    enabled: true
+    interval: 15s
+    scrapeTimeout: 10s
+    labels:
+      release: monitoring
+
 migration:
   enabled: true
   revision: "e6a64989b8f6"

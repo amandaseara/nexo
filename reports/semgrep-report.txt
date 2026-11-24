@@ -1,0 +1,87 @@
+INFORME SEMGREP (SAST) - NEXO
+=============================
+Fecha: 2026-11-24 16:58
+Herramienta: semgrep 1.186.0
+Lenguaje: Python 3.12 (FastAPI + SQLAlchemy)
+
+1. REGLAS APLICADAS
+-------------------
+a) Reglas propias (security/semgrep/rules.yml), especificas de Python:
+   - python-subprocess-shell-true  (ERROR, CWE-78 Inyeccion de comandos)
+       Detecta subprocess.<func>(..., shell=True, ...)
+   - python-dangerous-eval         (ERROR, CWE-95 Inyeccion de codigo)
+       Detecta eval(...)
+b) Ruleset de la comunidad p/python (reglas de seguridad de Python:
+   pickle, yaml.load, exec, SQL por concatenacion, requests sin verify,
+   hashes debiles, etc.)
+
+2. ESCANEO DEL PROYECTO
+-----------------------
+Comando:
+  semgrep scan --config security/semgrep/rules.yml --config p/python \
+      app/ scripts/ migrations/
+
+Resultado: 0 hallazgos, 0 errores, 22 ficheros analizados.
+
+Salida:
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 30 files tracked by git with 153 Code rules:
+  Scanning 22 files with 153 python rules.
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 0 (0 blocking)
+ • Rules run: 153
+ • Targets scanned: 22
+ • Parsed lines: ~100.0%
+ • Scan was limited to files tracked by git
+ • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
+Ran 153 rules on 22 files: 0 findings.
+(need more rules? `semgrep login` for additional free Semgrep Registry rules)
+If Semgrep missed a finding, please send us feedback to let us know!
+See https://semgrep.dev/docs/reporting-false-negatives/
+
+En el pipeline (etapa "Semgrep Security Scan" del Jenkinsfile) se ejecuta
+con --error, de modo que cualquier hallazgo detiene el build.
+
+3. JUSTIFICACION / CORRECCIONES
+-------------------------------
+No hay vulnerabilidades que corregir. Motivos:
+- El acceso a datos se hace siempre con el ORM de SQLAlchemy (select(),
+  db.get()) y parametros enlazados: no hay SQL construido con cadenas.
+- La validacion de entrada se hace con esquemas Pydantic.
+- No se usan eval/exec, pickle, yaml.load ni subprocess con shell=True.
+- Las credenciales no estan en el codigo: se leen de variables de entorno
+  (pydantic-settings) y en Kubernetes de un Secret (nexo-secret).
+
+4. VALIDACION DE LAS REGLAS
+---------------------------
+Para comprobar que las reglas propias funcionan (y que el 0 no es un
+falso negativo), se ejecutaron contra un fichero de ejemplo vulnerable
+fuera del repositorio:
+
+  import subprocess
+  def run_backup(filename):
+      subprocess.run(f"tar czf /tmp/backup.tgz {filename}", shell=True)
+  def calculate(expression):
+      return eval(expression)
+
+Comando: semgrep scan --config security/semgrep/rules.yml vulnerable_example.py
+┌─────────────────┐
+│ 2 Code Findings │
+└─────────────────┘
+    vulnerable_example.py
+   ❯❯❱ security.semgrep.python-subprocess-shell-true
+          ❰❰ Blocking ❱❱
+          Avoid subprocess calls with shell=True. Use argument lists and shell=False to prevent command
+          injection.                                                                                   
+            6┆ subprocess.run(f"tar czf /tmp/backup.tgz {filename}", shell=True)
+   ❯❯❱ security.semgrep.python-dangerous-eval
+          ❰❰ Blocking ❱❱
+          Avoid eval() with potentially untrusted input. Use safer alternatives such as explicit parsing.
+           11┆ return eval(expression)
+
+Ambas reglas detectan su patron (2 hallazgos bloqueantes).

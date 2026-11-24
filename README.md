@@ -6,6 +6,7 @@ Sistema de gestión de pedidos e inventario. Es una API REST con **FastAPI** y *
 
 ## Índice
 
+0. [Puesta en marcha rápida (demo)](#puesta-en-marcha-rápida-demo)
 1. [Arquitectura](#arquitectura)
 2. [Stack tecnológico](#stack-tecnológico)
 3. [Estructura del repositorio](#estructura-del-repositorio)
@@ -15,9 +16,41 @@ Sistema de gestión de pedidos e inventario. Es una API REST con **FastAPI** y *
 7. [Tests](#tests)
 8. [Docker](#docker)
 9. [Kubernetes con Helm](#kubernetes-con-helm)
-10. [Pipeline CI/CD (Jenkins)](#pipeline-cicd-jenkins)
-11. [Seguridad](#seguridad)
-12. [Informes](#informes)
+10. [Monitorización (Prometheus + Grafana)](#monitorización-prometheus--grafana)
+11. [Pipeline CI/CD (Jenkins)](#pipeline-cicd-jenkins)
+12. [Seguridad](#seguridad)
+13. [Informes](#informes)
+
+---
+
+## Puesta en marcha rápida (demo)
+
+Todo el entorno se levanta y se borra con scripts (macOS + Docker Desktop + Minikube):
+
+| Script | Qué hace |
+|---|---|
+| `scripts/start-tools.sh` | Arranca Docker Desktop, Minikube (con `metrics-server`) y Jenkins (`brew services`) |
+| `scripts/setup-all.sh` | Todo desde cero: herramientas → operadores (Prometheus Operator/Grafana, Kyverno, Falco) → NEXO con Helm → port-forwards → 60 s de tráfico |
+| `scripts/deploy-local.sh` | Construye la imagen dentro de Minikube, crea el Secret de la BD y hace `helm upgrade --install` |
+| `scripts/monitoring-up.sh` / `monitoring-down.sh` | Instala o borra kube-prometheus-stack y el dashboard |
+| `scripts/generate-traffic.sh [URL] [segundos]` | Genera tráfico realista para poblar los dashboards |
+| `scripts/port-forward.sh start\|stop\|status` | API :8000, Grafana :3000, Prometheus :9090 |
+| `scripts/teardown-all.sh [--stop-cluster\|--delete-cluster]` | Borra todos los recursos (y opcionalmente para o elimina Minikube) |
+
+```bash
+./scripts/setup-all.sh          # ~5-8 min la primera vez
+./scripts/teardown-all.sh       # limpiar
+```
+
+Al terminar, `setup-all.sh` muestra las URLs y la contraseña de Grafana:
+
+| Servicio | URL |
+|---|---|
+| API (Swagger) | http://localhost:8000/docs |
+| Métricas | http://localhost:8000/metrics |
+| Grafana | http://localhost:3000 (dashboard "NEXO - Visión general") |
+| Prometheus | http://localhost:9090/targets |
+| Jenkins | http://localhost:8080 |
 
 ---
 
@@ -38,6 +71,13 @@ Sistema de gestión de pedidos e inventario. Es una API REST con **FastAPI** y *
               │                                              ▼             │
               │                         Service ─► StatefulSet PostgreSQL  │
               │                                     (PVC persistente)      │
+              └──────────────────────────────┬─────────────────────────────┘
+                                             │ /metrics (ServiceMonitor)
+              ┌──────────── Kubernetes (namespace monitoring) ─────────────┐
+              │ Prometheus ◄── kube-state-metrics, cAdvisor (CPU/memoria)  │
+              │     │                                                      │
+              │     ▼                                                      │
+              │ Grafana (dashboard "NEXO - Visión general")                │
               └────────────────────────────────────────────────────────────┘
 ```
 
@@ -48,8 +88,9 @@ Sistema de gestión de pedidos e inventario. Es una API REST con **FastAPI** y *
 | API | Python 3.12, FastAPI, Uvicorn, Pydantic |
 | Persistencia | PostgreSQL 16, SQLAlchemy 2, Alembic (migraciones) |
 | Contenedores | Docker multi-stage (`python:3.12-slim-trixie`), Docker Compose |
-| Orquestación | Kubernetes (Minikube), Helm 3 |
+| Orquestación | Kubernetes (Minikube), Helm 4 |
 | CI/CD | Jenkins (declarative pipeline), GitHub Container Registry (GHCR) |
+| Observabilidad | `prometheus-client`, Prometheus + Grafana (kube-prometheus-stack) |
 | Seguridad | Semgrep (SAST), Snyk (SCA), Trivy (escaneo de imagen), Dive (análisis de capas) |
 | Tests | pytest, httpx, SQLite en memoria |
 
@@ -60,15 +101,18 @@ nexo/
 ├── app/
 │   ├── main.py            # App FastAPI, endpoints de salud y registro de routers
 │   ├── config.py          # Configuración vía variables de entorno (pydantic-settings)
+│   ├── metrics.py         # Métricas Prometheus (HTTP y negocio) y endpoint /metrics
 │   ├── database.py        # Engine, sesiones y Base declarativa de SQLAlchemy
 │   ├── models/            # Modelos ORM: Product, Inventory, Order, OrderItem
 │   ├── schemas/           # Esquemas Pydantic de entrada/salida
 │   └── routers/           # Endpoints: products, orders, inventory
 ├── migrations/            # Migraciones Alembic (esquema inicial e6a64989b8f6)
-├── tests/                 # Tests de pytest (health, products, orders)
+├── tests/                 # Tests de pytest (health, products, orders, metrics)
 ├── docker/Dockerfile      # Imagen multi-stage, usuario no root, HEALTHCHECK
 ├── compose.yaml           # PostgreSQL + API para desarrollo local
-├── helm-chart/            # Chart de Helm (API, PostgreSQL, migraciones, ingress)
+├── helm-chart/            # Chart de Helm (API, PostgreSQL, migraciones, ingress, ServiceMonitor)
+├── monitoring/            # Valores de kube-prometheus-stack (Prometheus + Grafana)
+├── grafana/dashboard.json # Dashboard de Grafana exportado
 ├── Jenkinsfile            # Pipeline CI/CD
 ├── security/semgrep/      # Reglas Semgrep personalizadas
 ├── scripts/               # Utilidades (arranque local, test de concurrencia, análisis de informes)
@@ -103,6 +147,7 @@ La documentación interactiva (Swagger) está en `http://localhost:8000/docs`.
 | GET | `/` | Mensaje de bienvenida |
 | GET | `/health` | *Liveness*: el proceso está vivo |
 | GET | `/health/ready` | *Readiness*: comprueba la conexión a PostgreSQL (devuelve 503 si falla) |
+| GET | `/metrics` | Métricas en formato Prometheus (ver [Monitorización](#monitorización-prometheus--grafana)) |
 
 ### Productos
 
@@ -171,7 +216,8 @@ cp .env.example .env
 |---|---|---|
 | `APP_NAME` | Nombre de la aplicación | `NEXO` |
 | `APP_ENV` | Entorno | `development` |
-| `DATABASE_URL` | Cadena de conexión SQLAlchemy | `postgresql+psycopg://nexo:nexo_password@localhost:5435/nexo` |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credenciales de PostgreSQL en Docker Compose (obligatorias) | `nexo` / `CHANGE_ME` / `nexo` |
+| `DATABASE_URL` | Cadena de conexión SQLAlchemy | `postgresql+psycopg://nexo:CHANGE_ME@localhost:5435/nexo` |
 
 ### Opción A: script de arranque
 
@@ -199,7 +245,7 @@ uvicorn app.main:app --reload      # API en localhost:8000
 pytest -v
 ```
 
-Los tests usan SQLite en memoria (sustituyen la dependencia `get_db`), así que no necesitan PostgreSQL. Cubren los endpoints de salud, el CRUD de productos y la lógica de pedidos (stock, duplicados, productos inactivos). Hay 19 tests.
+Los tests usan SQLite en memoria (sustituyen la dependencia `get_db`), así que no necesitan PostgreSQL. Cubren los endpoints de salud, el CRUD de productos y la lógica de pedidos (stock, duplicados, productos inactivos) y las métricas Prometheus. Hay 24 tests.
 
 Test de concurrencia contra una instancia real (requiere la API levantada):
 
@@ -237,7 +283,8 @@ El chart (`helm-chart/`) despliega:
 | `postgres-statefulset.yaml` | PostgreSQL con volumen persistente (PVC) |
 | `postgres-service.yaml` | Service interno de la base de datos |
 | `migration-job.yaml` | Job que espera a PostgreSQL y ejecuta `alembic upgrade` en cada release |
-| `configmap.yaml` / `secret.yaml` | Configuración de la app y credenciales de la base de datos |
+| `configmap.yaml` | Configuración de la app (las credenciales van en el Secret `nexo-secret`, creado aparte) |
+| `servicemonitor.yaml` | ServiceMonitor para que Prometheus recoja `/metrics` (solo si el clúster tiene la CRD de Prometheus Operator) |
 | `ingress.yaml` | Ingress nginx (opcional) |
 
 Ficheros de valores por entorno:
@@ -252,6 +299,7 @@ La imagen se descarga de GHCR, así que el namespace necesita un secret `ghcr-se
 
 ```bash
 kubectl create namespace nexo
+./scripts/create-db-secret.sh      # Secret nexo-secret con contraseña aleatoria
 kubectl create secret docker-registry ghcr-secret -n nexo \
   --docker-server=ghcr.io --docker-username=<usuario> --docker-password=<token>
 
@@ -260,6 +308,80 @@ helm upgrade --install nexo ./helm-chart -n nexo \
 
 kubectl port-forward svc/nexo-api 8000:8000 -n nexo
 ```
+
+## Monitorización (Prometheus + Grafana)
+
+### Instrumentación de la API
+
+`app/metrics.py` usa `prometheus-client`. Un *middleware* mide todas las peticiones y la API publica las métricas en `GET /metrics`:
+
+| Métrica | Tipo | Etiquetas | Qué mide |
+|---|---|---|---|
+| `nexo_http_requests_total` | Counter | `method`, `handler`, `status` | Peticiones procesadas |
+| `nexo_http_request_duration_seconds` | Histogram | `method`, `handler` | Latencia de respuesta |
+| `nexo_http_requests_in_progress` | Gauge | — | Peticiones en curso |
+| `nexo_orders_created_total` | Counter | — | **Negocio:** pedidos confirmados |
+| `nexo_order_revenue_total` | Counter | — | **Negocio:** importe facturado |
+| `nexo_order_items_sold_total` | Counter | — | **Negocio:** unidades vendidas |
+| `nexo_orders_rejected_total` | Counter | `reason` | **Negocio:** pedidos rechazados (`insufficient_stock`, `product_not_found`, `product_inactive`, `duplicate_products`) |
+
+`handler` es la plantilla de la ruta (`/orders/{order_id}`), no la URL concreta, para que el número de series no crezca con cada id. `/metrics` no se cuenta a sí mismo.
+
+```bash
+curl -s localhost:8000/metrics | grep ^nexo_
+```
+
+### Despliegue de Prometheus y Grafana
+
+Se usa el chart oficial `prometheus-community/kube-prometheus-stack` (versión fija 93.9.0) con los valores de `monitoring/kube-prometheus-stack-values.yaml`:
+
+- Prometheus descubre los `ServiceMonitor` de cualquier namespace.
+- Grafana viene con Prometheus ya configurado como fuente de datos. Su usuario admin está en el Secret `grafana-admin` (contraseña aleatoria).
+- Un *sidecar* de Grafana carga automáticamente los dashboards de los ConfigMaps con la etiqueta `grafana_dashboard=1`.
+- Se desactivan Alertmanager y los componentes del *control plane* que Minikube no expone.
+
+El chart de NEXO crea el `ServiceMonitor` `nexo-api`, que le dice a Prometheus que lea `/metrics` del Service de la API cada 15 s. Las métricas de CPU y memoria por pod vienen de cAdvisor (kubelet) y kube-state-metrics, que instala el propio stack.
+
+```bash
+./scripts/monitoring-up.sh          # instala el stack y carga el dashboard
+# (re)desplegar NEXO después, para que Helm cree el ServiceMonitor
+helm upgrade --install nexo ./helm-chart -n nexo -f helm-chart/values-dev.yaml
+
+# Grafana: http://localhost:3000 (usuario admin)
+kubectl port-forward -n monitoring svc/monitoring-grafana 3000:80
+kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d; echo
+
+# Prometheus: http://localhost:9090/targets
+kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 9090:9090
+
+./scripts/monitoring-down.sh        # desinstalar (--purge-crds borra también las CRDs)
+```
+
+### Dashboard
+
+`grafana/dashboard.json` es el dashboard exportado ("NEXO - Visión general", uid `nexo-overview`). Tiene una variable `namespace` (por defecto `nexo`) y estos paneles:
+
+| Sección | Panel | Consulta (resumida) |
+|---|---|---|
+| Resumen | Peticiones por segundo (RPS) | `sum(rate(nexo_http_requests_total[…]))` |
+| Resumen | Latencia media | `rate(…_duration_seconds_sum) / rate(…_duration_seconds_count)` |
+| Resumen | Tasa de errores 5xx | 5xx / total |
+| Resumen | Pedidos confirmados, Facturación | `increase(nexo_orders_created_total[$__range])`, `increase(nexo_order_revenue_total[$__range])` |
+| Tráfico y latencia | RPS por endpoint, por código de estado | `sum by (method, handler)`, `sum by (status)` |
+| Tráfico y latencia | Latencia media y p95, latencia por endpoint | `histogram_quantile(0.95, …_bucket)` |
+| Recursos por pod | Uso de CPU por pod (y límite) | `rate(container_cpu_usage_seconds_total{container="api"})` |
+| Recursos por pod | Uso de memoria por pod (y límite) | `container_memory_working_set_bytes{container="api"}` |
+| Negocio | Pedidos por minuto (confirmados / rechazados por motivo) | `rate(nexo_orders_created_total)`, `rate(nexo_orders_rejected_total) by (reason)` |
+| Negocio | Facturación y unidades vendidas por minuto | `rate(nexo_order_revenue_total)`, `rate(nexo_order_items_sold_total)` |
+
+Para que los paneles tengan datos, se genera tráfico contra la API:
+
+```bash
+kubectl port-forward svc/nexo-api 8000:8000 -n nexo &
+./scripts/generate-traffic.sh http://localhost:8000 300   # 5 minutos
+```
+
+El script crea productos, hace pedidos (algunos fallan a propósito por stock insuficiente o producto inexistente), repone stock y consulta productos, inventario y pedidos.
 
 ## Pipeline CI/CD (Jenkins)
 
@@ -306,9 +428,12 @@ En `reports/` están las evidencias de cada fase:
 | Carpeta | Contenido |
 |---|---|
 | `reports/database/` | Resultados de pytest, estado de Alembic y test de concurrencia |
-| `reports/image-analysis/` | Trivy antes y después del hardening, Dive, `docker history` e `inspect` |
+| `reports/image-analysis.md` | Informe de la imagen: tamaño (240,6 MB), 10 capas, eficiencia y optimizaciones posibles |
+| `reports/image-analysis/` | Trivy antes y después del hardening, Dive, `docker history` e `inspect` (también de la 0.4.0) |
 | `reports/jenkins/` | Pruebas del *gate* de Trivy en el pipeline |
 | `reports/kubernetes/` | Estado de Minikube, pods, servicios, Helm y checks de salud |
-| `reports/semgrep-report.*` | Resultado del análisis Semgrep |
+| `reports/semgrep-report.txt` | Semgrep: reglas aplicadas, 0 hallazgos en el proyecto y validación de las reglas con un ejemplo vulnerable |
+| `reports/monitoring/` | Pods, ServiceMonitor, targets de Prometheus y consultas de los paneles de Grafana |
+| `grafana/dashboard.json` | Dashboard de Grafana exportado |
 
 `scripts/compare_trivy.py` resume y compara los informes de Trivy de la imagen inicial y la final.
