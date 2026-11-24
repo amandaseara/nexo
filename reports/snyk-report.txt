@@ -1,0 +1,83 @@
+INFORME SNYK (SCA - dependencias) - NEXO
+========================================
+Fecha: 2026-11-24 17:19
+Herramienta: Snyk CLI 1.1309.0
+Gestor: pip (Python 3.12) - requirements.txt y requirements-dev.txt
+
+1. COMANDOS (los mismos que la etapa "Snyk Dependency Scan" del Jenkinsfile)
+-----------------------------------------------------------------------------
+  snyk test --file=requirements.txt     --package-manager=pip --command=.venv/bin/python
+  snyk test --file=requirements-dev.txt --package-manager=pip --command=.venv/bin/python
+
+2. DEPENDENCIAS DE PRODUCCION (requirements.txt)
+------------------------------------------------
+Testing  (requirements.txt) ...
+Tested 28 dependencies for known issues, found 0 issues, 0 vulnerable paths.
+Open Security issues: 0
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Test Summary                                                                 │
+│                                                                              │
+│   Organization:      ibonarambarri                                           │
+│   Test type:         Software Composition Analysis                           │
+│   Project name:      nexo                                                    │
+│   Project path:      /Users/ibonarambarri/Desktop/carpeta sin título/nexo    │
+│   Target file:       requirements.txt                                        │
+│                                                                              │
+│   Total security issues: 0                                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+💡 Tip
+   To view ignored issues, use the --include-ignores option.
+
+3. DEPENDENCIAS DE DESARROLLO (requirements-dev.txt)
+----------------------------------------------------
+Testing  (requirements-dev.txt) ...
+Tested 35 dependencies for known issues, found 0 issues, 0 vulnerable paths.
+Open Security issues: 0
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Test Summary                                                                 │
+│                                                                              │
+│   Organization:      ibonarambarri                                           │
+│   Test type:         Software Composition Analysis                           │
+│   Project name:      nexo                                                    │
+│   Project path:      /Users/ibonarambarri/Desktop/carpeta sin título/nexo    │
+│   Target file:       requirements-dev.txt                                    │
+│                                                                              │
+│   Total security issues: 0                                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+💡 Tip
+   To view ignored issues, use the --include-ignores option.
+
+4. SECURITY GATE DEL PIPELINE (scripts/check_snyk.py)
+-----------------------------------------------------
+Critical vulnerabilities found: 0
+SNYK SECURITY GATE: PASSED
+
+El pipeline se detiene (exit 1) si aparece cualquier vulnerabilidad de
+severidad CRITICAL en cualquiera de los dos informes.
+
+5. VULNERABILIDADES CRITICAS Y CORRECCIONES
+-------------------------------------------
+Resultado: 0 vulnerabilidades (0 criticas, 0 altas, 0 medias, 0 bajas)
+en las dependencias de produccion (28 paquetes, incluidas las transitivas)
+y en las de desarrollo.
+
+No hay vulnerabilidades criticas que corregir. Medidas que lo mantienen asi:
+- Todas las dependencias directas estan fijadas a una version exacta (==),
+  sin rangos: lo que se escanea es exactamente lo que se instala en la imagen.
+- Las versiones se actualizaron a las ultimas estables (fastapi 0.162.2,
+  starlette 1.10.0, sqlalchemy 2.0.41, psycopg 3.2.9, alembic 1.17.2,
+  prometheus-client 0.22.1...).
+- Snyk se ejecuta en cada build de Jenkins y el gate bloquea el despliegue
+  si aparece una critica nueva (por ejemplo, un CVE publicado despues).
+
+Correccion propuesta si el gate fallara en el futuro:
+  1. Ejecutar 'snyk test' y revisar la ruta (paquete directo o transitivo).
+  2. Subir la version fijada en requirements.txt a la que indica
+     "Upgrade ... to ..." en la salida de Snyk (o fijar la transitiva).
+  3. Si no hay version corregida: evaluar el impacto real y, solo si no es
+     explotable en NEXO, ignorarla temporalmente con 'snyk ignore --id=...
+     --expiry=...' documentando el motivo.
+
+Nota: las vulnerabilidades del sistema operativo de la imagen (paquetes de
+Debian) no las cubre este escaneo de dependencias; las cubre Trivy en la
+etapa "Trivy Image Scan" (0 CRITICAL, ver reports/image-analysis.md).

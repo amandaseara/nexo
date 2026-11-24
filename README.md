@@ -20,7 +20,9 @@ Sistema de gestión de pedidos e inventario. Es una API REST con **FastAPI** y *
 11. [Pipeline CI/CD (Jenkins)](#pipeline-cicd-jenkins)
 12. [Seguridad](#seguridad)
 13. [Seguridad en el clúster: Kyverno y Falco](#seguridad-en-el-clúster-kyverno-y-falco)
-14. [Informes](#informes)
+14. [Problemas encontrados y soluciones](#problemas-encontrados-y-soluciones)
+15. [Conclusiones y oportunidades de mejora](#conclusiones-y-oportunidades-de-mejora)
+16. [Informes](#informes)
 
 ---
 
@@ -377,6 +379,14 @@ kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 909
 | Negocio | Pedidos por minuto (confirmados / rechazados por motivo) | `rate(nexo_orders_created_total)`, `rate(nexo_orders_rejected_total) by (reason)` |
 | Negocio | Facturación y unidades vendidas por minuto | `rate(nexo_order_revenue_total)`, `rate(nexo_order_items_sold_total)` |
 
+Capturas del dashboard con tráfico generado por `generate-traffic.sh`:
+
+![Dashboard NEXO: resumen, tráfico y latencia](docs/images/grafana-dashboard.jpg)
+
+| Memoria por pod (frente al límite) | Pedidos por minuto (métrica de negocio) |
+|---|---|
+| ![Memoria por pod](docs/images/grafana-memoria-pod.jpg) | ![Pedidos por minuto](docs/images/grafana-pedidos.jpg) |
+
 Para que los paneles tengan datos, se genera tráfico contra la API:
 
 ```bash
@@ -425,6 +435,33 @@ El agente necesita Python 3, Docker, Semgrep, Snyk CLI, Trivy, Helm y `kubectl` 
 | Falco | Seguridad en ejecución | Detecta comportamiento sospechoso en contenedores que ya están corriendo |
 
 Medidas en el despliegue: contenedores no root, `seccompProfile: RuntimeDefault`, sin token de *service account* montado en el Job de migraciones, límites de CPU/memoria, credenciales en `Secret` y PostgreSQL publicado solo en `127.0.0.1` en local.
+
+### Resultados de los análisis de seguridad
+
+| Herramienta | Resultado | Evidencia |
+|---|---|---|
+| Semgrep (2 reglas propias + 151 de `p/python`) | **0 hallazgos** en 22 ficheros. Las reglas propias se validaron con un ejemplo vulnerable y detectan sus 2 patrones | `reports/semgrep-report.txt` |
+| Snyk (SCA) | **0 vulnerabilidades**: 28 dependencias de producción y 35 de desarrollo. El *gate* `check_snyk.py` pasa | `reports/snyk-report.txt` |
+| Trivy (imagen 0.4.0) | **0 CRITICAL**, 53 HIGH (paquetes de Debian 13). Antes del cambio a trixie había 9 CRITICAL | `reports/image-analysis/trivy-0.4.0.txt` |
+| Kyverno | **7/7 OK**: los 5 pods que incumplen se rechazan, y el pod correcto y el chart de NEXO se admiten | `reports/kyverno-validation.log` |
+| Falco | Alerta **"Search Private Keys or Passwords"** (Warning) al buscar `id_rsa` desde un pod de `nexo` | `reports/falco-event.log` |
+
+```text
+$ snyk test --file=requirements.txt --package-manager=pip
+Tested 28 dependencies for known issues, found 0 issues, 0 vulnerable paths.
+
+$ semgrep scan --config security/semgrep/rules.yml --config p/python app/ scripts/ migrations/
+Ran 153 rules on 22 files: 0 findings.
+
+$ ./scripts/validate-kyverno.sh
+[OK] 00-good-pod.yaml -> ADMITIDO
+[OK] 01-bad-latest-tag.yaml -> RECHAZADO
+[OK] 01-bad-no-tag.yaml -> RECHAZADO
+[OK] 02-bad-no-limits.yaml -> RECHAZADO
+[OK] 03-bad-root.yaml -> RECHAZADO
+[OK] 04-bad-no-probes.yaml -> RECHAZADO
+[OK] chart de NEXO
+```
 
 ## Seguridad en el clúster: Kyverno y Falco
 
@@ -538,6 +575,44 @@ process=find command=find /etc /home -name id_rsa container_image_repository=bus
 container_image_tag=1.36 k8s_pod_name=falco-test k8s_ns_name=nexo
 ```
 
+## Problemas encontrados y soluciones
+
+| Problema | Causa | Solución |
+|---|---|---|
+| 9 CVE **CRITICAL** en la imagen inicial | Base `python:3.12-slim-bookworm` con paquetes de Debian 12 vulnerables | Cambio a `python:3.12.16-slim-trixie` (Debian 13): 0 CRITICAL |
+| Credenciales de la BD en `values.yaml` | El chart creaba el Secret con una contraseña fija | Se eliminó `secret.yaml`. `scripts/create-db-secret.sh` crea `nexo-secret` con una contraseña aleatoria y el chart usa `database.existingSecret` |
+| Grafana se reiniciaba (`OOMKilled`) | Límite de memoria de 256Mi insuficiente con los *sidecars* de dashboards | Límite subido a 512Mi en `monitoring/kube-prometheus-stack-values.yaml` |
+| Paneles de CPU y memoria por pod vacíos | Con el *runtime* `docker` de Minikube, cAdvisor no etiqueta las series con `container="api"`, solo a nivel de pod | Las consultas usan el *cgroup* del pod (`container=""`, `pod=~".+-api-.+"`). Funciona con docker y con containerd |
+| Cardinalidad de métricas | Etiquetar con la URL real (`/orders/123`) crea una serie por id | El *middleware* usa la plantilla de la ruta (`/orders/{order_id}`) |
+| El `ServiceMonitor` rompía `helm template` en Jenkins | La CRD de Prometheus Operator no existe fuera del clúster | Se crea solo si `.Capabilities` tiene `monitoring.coreos.com/v1/ServiceMonitor` |
+| `validate-kyverno.sh` daba error con NEXO ya desplegado | El *dry-run* intentaba modificar el Job de migraciones, que es inmutable | El *dry-run* usa otro nombre de *release* (`nexo-policy-check`) |
+| Jenkins no encontraba `docker`, `helm`, `semgrep`, etc. | Jenkins (launchd) arranca con un `PATH` mínimo | Variable global `PATH+EXTRA` con `/opt/homebrew/bin` y Python 3.12 |
+| `helm upgrade --atomic` falla en Helm 4 | La opción se renombró en Helm 4 | Se usa `--rollback-on-failure` |
+| `minikube start` fallaba en el portátil de la demo (Apple M6, macOS 27) | Fallo de minikube al leer la información de CPU del host | `scripts/start-tools.sh` usa una librería de compatibilidad local solo para `minikube start` |
+
+## Conclusiones y oportunidades de mejora
+
+**Conclusiones**
+
+- NEXO pasó de ser una API que se ejecutaba en local a un servicio que se construye, analiza, publica y despliega automáticamente. Cada cambio pasa por tests, SAST (Semgrep), SCA (Snyk) y escaneo de imagen (Trivy) antes de llegar al clúster, y el pipeline se para ante cualquier vulnerabilidad crítica.
+- La seguridad está en varias capas que se complementan:
+  - *Shift-left* en el pipeline: Semgrep, Snyk y Trivy.
+  - Admisión en el clúster: Kyverno controla *cómo* está configurado un pod.
+  - Ejecución: Falco vigila *qué hace* el pod una vez que corre.
+- La observabilidad combina métricas técnicas (RPS, latencia, errores, CPU y memoria) con métricas de negocio (pedidos, facturación, rechazos por motivo). Así un problema técnico se ve también por su impacto en el negocio.
+- Todo el entorno se levanta y se borra con scripts (`setup-all.sh` y `teardown-all.sh`), así que la demo es reproducible.
+
+**Oportunidades de mejora**
+
+- **Imagen:**
+  - Quitar `pip` del *virtualenv* final, usar `uvicorn` sin `[standard]` o pasar a una base *distroless*. Se ahorrarían entre 40 y 80 MB y desaparecerían muchas CVE HIGH del sistema.
+  - Firmar las imágenes con Cosign y verificarlas con una política de Kyverno.
+- **Kyverno:** extender las políticas a todo el clúster, con excepciones para los namespaces del sistema, y añadir más: prohibir contenedores privilegiados, `hostPath` y `readOnlyRootFilesystem` obligatorio.
+- **Alertas:** activar Alertmanager con reglas sobre la tasa de 5xx, la latencia p95 y la falta de stock, y enviar las alertas de Falco a Slack mediante Falcosidekick.
+- **Despliegue:** separar los entornos por namespace (dev, staging y prod) con promoción manual a producción, o hacer despliegue GitOps con Argo CD.
+- **Rendimiento:** HPA basado en RPS y una prueba de carga con k6 o Locust en el pipeline.
+- **Infraestructura:** PostgreSQL gestionado o con un operador (CloudNativePG) para tener *backups* y alta disponibilidad.
+
 ## Informes
 
 En `reports/` están las evidencias de cada fase:
@@ -552,6 +627,7 @@ En `reports/` están las evidencias de cada fase:
 | `reports/semgrep-report.txt` | Semgrep: reglas aplicadas, 0 hallazgos en el proyecto y validación de las reglas con un ejemplo vulnerable |
 | `reports/monitoring/` | Pods, ServiceMonitor, targets de Prometheus y consultas de los paneles de Grafana |
 | `grafana/dashboard.json` | Dashboard de Grafana exportado |
+| `reports/snyk-report.txt` | Snyk: 0 vulnerabilidades en las dependencias de producción y desarrollo, *gate* y correcciones propuestas |
 | `reports/kyverno-validation.log` | Pods rechazados y admitidos por cada política de Kyverno |
 | `reports/falco-event.log` | Alerta de Falco y descripción del evento |
 
